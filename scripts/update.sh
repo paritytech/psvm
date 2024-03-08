@@ -22,6 +22,7 @@ cd "$TARGET_DIR" || exit
 
 # Loop through each branch, checkout, execute get_version.sh, and move the output
 for BRANCH in "${BRANCHES[@]}"; do
+  git stash -u
   git checkout $BRANCH
 
   echo "Processing $BRANCH"

@@ -5,7 +5,7 @@ This is a simple tool to manage and update the Polkadot SDK dependencies in any 
 ## Installation
 
 ```sh
-cargo install --git https:://github.com/paritytech/psvm psvm
+cargo install --git https://github.com/paritytech/psvm psvm
 ```
 
 ## Usage

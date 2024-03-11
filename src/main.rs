@@ -70,12 +70,15 @@ fn update_dependencies(cargo_toml_path: &str, crates_versions: &BTreeMap<String,
 fn update_dependencies_impl(cargo_toml_path: &str, crates_versions: &BTreeMap<String, String>, overwrite: bool) -> Result<String, Box<dyn std::error::Error>> {
     let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
     let mut cargo_toml: Document = cargo_toml_content.parse()?;
+    // Check if cargo workspace is defined
+    let deps = match cargo_toml.as_table_mut().get_mut("workspace") {
+        Some(toml_edit::Item::Table(table)) => table,
+        _ => cargo_toml.as_table_mut()
+    };
 
     for table in ["dependencies", "dev-dependencies", "build-dependencies"].iter() {
-        if let Some(dep_item) = cargo_toml.as_table_mut().get_mut(table) {
-            if let toml_edit::Item::Table(dep_table) = dep_item {
+        if let Some(toml_edit::Item::Table(dep_table)) = deps.get_mut(table) {
                 update_table_dependencies(dep_table, crates_versions, overwrite);
-            }
         }
     }
 
@@ -101,6 +104,7 @@ fn update_table_dependencies(dep_table: &mut toml_edit::Table, crates_versions: 
                 } 
 
                 table.remove("git");
+                table.remove("rev");
                 table.remove("branch");
                 table.remove("tag");
                 table.remove("path");

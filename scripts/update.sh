@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eu
+
 PDSKVM_DIR="$(git rev-parse --show-toplevel)"
 PROCESS_SCRIPT="$PDSKVM_DIR/scripts/process.sh"
 VERSIONS_DIR="$PDSKVM_DIR/src/versions/"

@@ -17,7 +17,7 @@ if [[ $TARGET_DIR != */polkadot-sdk ]]; then
 fi
 
 # Hardcoded list of branches to checkout
-BRANCHES=("release-crates-io-v1.3.0" "release-crates-io-v1.4.0" "release-crates-io-v1.5.0" "release-crates-io-v1.6.0" "release-crates-io-v1.7.0" "release-crates-io-v1.8.0")
+BRANCHES=("release-crates-io-v1.3.0" "release-crates-io-v1.4.0" "release-crates-io-v1.5.0" "release-crates-io-v1.6.0" "release-crates-io-v1.7.0" "release-crates-io-v1.8.0" "release-crates-io-v1.9.0")
 
 # Navigate to the target directory
 cd "$TARGET_DIR" || exit

@@ -15,8 +15,8 @@
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use serde_json::from_str;
+    use std::collections::BTreeMap;
     use std::path::Path;
 
     #[test]
@@ -30,7 +30,8 @@ mod tests {
         let crates_versions: BTreeMap<String, String> = from_str(crates_versions_data).unwrap();
 
         // Call the refactored logic function with the test data
-        let result = crate::update_dependencies_impl(&input_toml_path, &crates_versions, false).unwrap();
+        let result =
+            crate::update_dependencies_impl(&input_toml_path, &crates_versions, false).unwrap();
 
         println!("{}", result);
 

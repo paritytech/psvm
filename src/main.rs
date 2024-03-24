@@ -13,18 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod versions;
 mod tests;
+mod versions;
 
+use clap::{App, Arg};
+use env_logger::Env;
+use serde_json::from_str;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use clap::{App, Arg};
-use serde_json::from_str;
-use std::collections::BTreeMap;
 use toml_edit::Document;
 use versions::get_version_mapping;
-use env_logger::Env;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
@@ -33,21 +33,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .version("1.0")
         .about("Updates Cargo.toml dependencies based on Polkadot SDK crates.io release branch")
         .author("Patricio (patriciobcs)")
-        .arg(Arg::with_name("PATH")
-             .help("Path to a crate folder or Cargo.toml file.")
-             .default_value("Cargo.toml")
-             .short('p')
-             .long("path"))
-        .arg(Arg::with_name("VERSION")
-             .help("Specifies the Polkadot SDK version")
-             .default_value("1.3.0")
-             .short('v')
-             .long("version"))
-        .arg(Arg::with_name("OVERWRITE")
-             .help("Overwrite local dependencies (using path)")
-             .takes_value(false)
-             .short('o')
-             .long("overwrite"))
+        .arg(
+            Arg::with_name("PATH")
+                .help("Path to a crate folder or Cargo.toml file.")
+                .default_value("Cargo.toml")
+                .short('p')
+                .long("path"),
+        )
+        .arg(
+            Arg::with_name("VERSION")
+                .help("Specifies the Polkadot SDK version")
+                .default_value("1.3.0")
+                .short('v')
+                .long("version"),
+        )
+        .arg(
+            Arg::with_name("OVERWRITE")
+                .help("Overwrite local dependencies (using path)")
+                .takes_value(false)
+                .short('o')
+                .long("overwrite"),
+        )
         .get_matches();
 
     let cargo_toml_path = validate_workspace_path(matches.value_of("PATH").unwrap())?;
@@ -71,35 +77,50 @@ fn validate_workspace_path(cargo_toml_path: &str) -> Result<PathBuf, Box<dyn std
     }
 
     if !path.exists() {
-        return Err(format!("Could not find workspace root Cargo.toml file at {}", path.display()).into());
+        return Err(format!(
+            "Could not find workspace root Cargo.toml file at {}",
+            path.display()
+        )
+        .into());
     }
 
     Ok(path)
 }
 
-fn update_dependencies(cargo_toml_path: &Path, crates_versions: &BTreeMap<String, String>, overwrite: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn update_dependencies(
+    cargo_toml_path: &Path,
+    crates_versions: &BTreeMap<String, String>,
+    overwrite: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let cargo_toml = update_dependencies_impl(cargo_toml_path, crates_versions, overwrite)?;
 
     match cargo_toml {
         Some(new_content) => {
             fs::write(cargo_toml_path, new_content)?;
             println!("Updated dependencies in {}", cargo_toml_path.display());
-        },
+        }
         None => {
-            println!("Dependencies in {} are already up to date", cargo_toml_path.display());
+            println!(
+                "Dependencies in {} are already up to date",
+                cargo_toml_path.display()
+            );
         }
     }
 
     Ok(())
 }
 
-fn update_dependencies_impl(cargo_toml_path: &Path, crates_versions: &BTreeMap<String, String>, overwrite: bool) -> Result<Option<String>, Box<dyn std::error::Error>> {
+fn update_dependencies_impl(
+    cargo_toml_path: &Path,
+    crates_versions: &BTreeMap<String, String>,
+    overwrite: bool,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
     let mut cargo_toml: Document = cargo_toml_content.parse()?;
     // Check if cargo workspace is defined
     let deps = match cargo_toml.as_table_mut().get_mut("workspace") {
         Some(toml_edit::Item::Table(table)) => table,
-        _ => cargo_toml.as_table_mut()
+        _ => cargo_toml.as_table_mut(),
     };
 
     for table in ["dependencies", "dev-dependencies", "build-dependencies"].iter() {
@@ -116,15 +137,20 @@ fn update_dependencies_impl(cargo_toml_path: &Path, crates_versions: &BTreeMap<S
     }
 }
 
-fn update_table_dependencies(dep_table: &mut toml_edit::Table, crates_versions: &BTreeMap<String, String>, overwrite: bool) {
+fn update_table_dependencies(
+    dep_table: &mut toml_edit::Table,
+    crates_versions: &BTreeMap<String, String>,
+    overwrite: bool,
+) {
     for (dep_key, dep_value) in dep_table.iter_mut() {
         let dep_key_str = dep_key.get();
 
         // account for dep renaming:
         let lookup_key = if let Some(table) = dep_value.as_table_like() {
-            table.get("package")
-                 .and_then(|p| p.as_str())
-                 .unwrap_or(dep_key_str)
+            table
+                .get("package")
+                .and_then(|p| p.as_str())
+                .unwrap_or(dep_key_str)
         } else {
             dep_key_str
         };
@@ -137,7 +163,7 @@ fn update_table_dependencies(dep_table: &mut toml_edit::Table, crates_versions: 
         if let Some(table) = dep_value.as_table_like_mut() {
             if !overwrite && table.get("path").is_some() {
                 continue;
-            } 
+            }
 
             table.remove("git");
             table.remove("rev");
@@ -146,10 +172,13 @@ fn update_table_dependencies(dep_table: &mut toml_edit::Table, crates_versions: 
             table.remove("path");
 
             let mut new_table = toml_edit::InlineTable::default();
-            
+
             // Directly create a `toml_edit::Value` for the version
-            new_table.get_or_insert("version", toml_edit::value(crate_version.clone()).as_value().unwrap());
-            
+            new_table.get_or_insert(
+                "version",
+                toml_edit::value(crate_version.clone()).as_value().unwrap(),
+            );
+
             for (key, value) in table.iter() {
                 // Ensure we're inserting `Value`s, not `Item`s
                 if key != "version" && value.is_value() {
@@ -157,7 +186,7 @@ fn update_table_dependencies(dep_table: &mut toml_edit::Table, crates_versions: 
                 }
             }
             new_table.fmt();
-            
+
             // Replace the original table-like item with the new inline table
             *dep_value = toml_edit::Item::Value(toml_edit::Value::InlineTable(new_table));
         } else if dep_value.is_str() {

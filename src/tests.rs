@@ -33,9 +33,7 @@ mod tests {
         let result =
             crate::update_dependencies_impl(&input_toml_path, &crates_versions, false).unwrap();
 
-        println!("{}", result);
-
         // Assert that the result matches the expected output
-        assert_eq!(result, expected_output_toml);
+        assert_eq!(result, Some(expected_output_toml.into()));
     }
 }

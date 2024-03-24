@@ -17,6 +17,8 @@ mod versions;
 mod tests;
 
 use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
 use clap::{App, Arg};
 use serde_json::from_str;
 use std::collections::BTreeMap;
@@ -29,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .about("Updates Cargo.toml dependencies based on Polkadot SDK crates.io release branch")
         .author("Patricio (patriciobcs)")
         .arg(Arg::with_name("PATH")
-             .help("Sets the path to the Cargo.toml file")
+             .help("Path to the workspace root folder or workspace Cargo.toml.")
              .default_value("Cargo.toml")
              .short('p')
              .long("path"))
@@ -45,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              .long("overwrite"))
         .get_matches();
 
-    let cargo_toml_path = matches.value_of("PATH").unwrap();
+    let cargo_toml_path = validate_workspace_path(matches.value_of("PATH").unwrap())?;
     let version = matches.value_of("VERSION").unwrap();
     let overwrite = matches.is_present("OVERWRITE");
 
@@ -54,20 +56,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let crates_versions: BTreeMap<String, String> = from_str(crates_versions_data)?;
 
-    update_dependencies(cargo_toml_path, &crates_versions, overwrite)?;
+    update_dependencies(&cargo_toml_path, &crates_versions, overwrite)?;
 
     Ok(())
 }
 
-fn update_dependencies(cargo_toml_path: &str, crates_versions: &BTreeMap<String, String>, overwrite: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn validate_workspace_path(cargo_toml_path: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let mut path = PathBuf::from(cargo_toml_path);
+    if path.is_dir() {
+        path = path.join("Cargo.toml");
+    }
+
+    if !path.exists() {
+        return Err(format!("Could not find workspace root Cargo.toml file at {}", path.display()).into());
+    }
+
+    Ok(path)
+}
+
+fn update_dependencies(cargo_toml_path: &Path, crates_versions: &BTreeMap<String, String>, overwrite: bool) -> Result<(), Box<dyn std::error::Error>> {
     let cargo_toml = update_dependencies_impl(cargo_toml_path, crates_versions, overwrite)?;
 
     fs::write(cargo_toml_path, cargo_toml)?;
-    println!("Updated dependencies in {}", cargo_toml_path);
+    println!("Updated dependencies in {}", cargo_toml_path.display());
     Ok(())
 }
 
-fn update_dependencies_impl(cargo_toml_path: &str, crates_versions: &BTreeMap<String, String>, overwrite: bool) -> Result<String, Box<dyn std::error::Error>> {
+fn update_dependencies_impl(cargo_toml_path: &Path, crates_versions: &BTreeMap<String, String>, overwrite: bool) -> Result<String, Box<dyn std::error::Error>> {
     let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
     let mut cargo_toml: Document = cargo_toml_content.parse()?;
     // Check if cargo workspace is defined

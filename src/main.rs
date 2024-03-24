@@ -16,62 +16,52 @@
 mod tests;
 mod versions;
 
-use clap::{App, Arg};
+use clap::Parser;
 use env_logger::Env;
 use serde_json::from_str;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use toml_edit::Document;
+use toml_edit::DocumentMut;
 use versions::get_version_mapping;
+
+/// Polkadot SDK Version Manager.
+///
+/// Updates Cargo.toml dependencies based on Polkadot SDK crates.io release branch.
+#[derive(Parser, Debug)]
+#[command(about, author)]
+struct Command {
+    /// Path to a crate folder or Cargo.toml file.
+    #[clap(short, long, default_value = "Cargo.toml")]
+    path: PathBuf,
+
+    /// Specifies the Polkadot SDK version.
+    #[clap(short, long)]
+    version: String,
+
+    /// Overwrite local dependencies (using path).
+    #[clap(short, long)]
+    overwrite: bool,
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    let cmd = Command::parse();
 
-    let matches = App::new("Polkadot SDK Version Manager")
-        .version("1.0")
-        .about("Updates Cargo.toml dependencies based on Polkadot SDK crates.io release branch")
-        .author("Patricio (patriciobcs)")
-        .arg(
-            Arg::with_name("PATH")
-                .help("Path to a crate folder or Cargo.toml file.")
-                .default_value("Cargo.toml")
-                .short('p')
-                .long("path"),
-        )
-        .arg(
-            Arg::with_name("VERSION")
-                .help("Specifies the Polkadot SDK version")
-                .default_value("1.3.0")
-                .short('v')
-                .long("version"),
-        )
-        .arg(
-            Arg::with_name("OVERWRITE")
-                .help("Overwrite local dependencies (using path)")
-                .takes_value(false)
-                .short('o')
-                .long("overwrite"),
-        )
-        .get_matches();
-
-    let cargo_toml_path = validate_workspace_path(matches.value_of("PATH").unwrap())?;
-    let version = matches.value_of("VERSION").unwrap();
-    let overwrite = matches.is_present("OVERWRITE");
+    let cargo_toml_path = validate_workspace_path(cmd.path)?;
 
     // Decide which branch data to use based on the branch name
-    let crates_versions_data = get_version_mapping(version);
+    let crates_versions_data = get_version_mapping(&cmd.version);
 
     let crates_versions: BTreeMap<String, String> = from_str(crates_versions_data)?;
 
-    update_dependencies(&cargo_toml_path, &crates_versions, overwrite)?;
+    update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
 
     Ok(())
 }
 
-fn validate_workspace_path(cargo_toml_path: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let mut path = PathBuf::from(cargo_toml_path);
+fn validate_workspace_path(mut path: PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if path.is_dir() {
         path = path.join("Cargo.toml");
     }
@@ -116,7 +106,7 @@ fn update_dependencies_impl(
     overwrite: bool,
 ) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
-    let mut cargo_toml: Document = cargo_toml_content.parse()?;
+    let mut cargo_toml: DocumentMut = cargo_toml_content.parse()?;
     // Check if cargo workspace is defined
     let deps = match cargo_toml.as_table_mut().get_mut("workspace") {
         Some(toml_edit::Item::Table(table)) => table,

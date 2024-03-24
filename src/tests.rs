@@ -17,11 +17,12 @@
 mod tests {
     use std::collections::BTreeMap;
     use serde_json::from_str;
+    use std::path::Path;
 
     #[test]
     fn test_dependency_update() {
         // Example input TOML and expected output TOML as strings
-        let input_toml_path = "src/testing/input.Cargo.toml";
+        let input_toml_path = Path::new("src/testing/input.Cargo.toml");
         let expected_output_toml = include_str!("testing/output.Cargo.toml");
 
         // Example versions data as a string
@@ -29,7 +30,7 @@ mod tests {
         let crates_versions: BTreeMap<String, String> = from_str(crates_versions_data).unwrap();
 
         // Call the refactored logic function with the test data
-        let result = crate::update_dependencies_impl(input_toml_path, &crates_versions, false).unwrap();
+        let result = crate::update_dependencies_impl(&input_toml_path, &crates_versions, false).unwrap();
 
         println!("{}", result);
 

@@ -1,6 +1,6 @@
 [package]
 name = "psvm"
-version = "0.1.0"
+version = "0.1.1"
 description = "A tool to manage and update the Polkadot SDK dependencies in any Cargo.toml file."
 repository = "https://github.com/paritytech/psvm"
 authors = ["Parity Technologies <admin@parity.io>"]
@@ -13,3 +13,5 @@ clap = "3.0"
 toml_edit = "0.11.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+log = "0.4.21"
+env_logger = "0.11.3"

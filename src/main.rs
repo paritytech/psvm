@@ -18,13 +18,14 @@ mod versions;
 
 use clap::Parser;
 use env_logger::Env;
-use serde_json::from_str;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use toml_edit::DocumentMut;
-use versions::get_version_mapping;
+use versions::{get_branch_mapping, get_version_mapping};
+
+pub const DEFAULT_GIT_SERVER: &str = "https://raw.githubusercontent.com";
 
 /// Polkadot SDK Version Manager.
 ///
@@ -37,24 +38,46 @@ struct Command {
     path: PathBuf,
 
     /// Specifies the Polkadot SDK version.
+    #[clap(
+        short,
+        long,
+        conflicts_with = "branch",
+        required_unless_present = "branch"
+    )]
+    version: Option<String>,
+
+    /// Specifies a Polkadot SDK branch to get the versions. Can't be used at the same time as `version`.
     #[clap(short, long)]
-    version: String,
+    branch: Option<String>,
+
+    /// Specifies the source file to get the versions.
+    #[clap(short, long, value_parser = ["Cargo.lock", "Plan.toml"], default_value = "Plan.toml")]
+    source: String,
 
     /// Overwrite local dependencies (using path).
     #[clap(short, long)]
     overwrite: bool,
+
+    /// Specifies the git server to get the versions when using the `branch` flag.
+    #[clap(short, long, default_value = DEFAULT_GIT_SERVER)]
+    git_server: String,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let cmd = Command::parse();
 
     let cargo_toml_path = validate_workspace_path(cmd.path)?;
 
     // Decide which branch data to use based on the branch name
-    let crates_versions_data = get_version_mapping(&cmd.version);
-
-    let crates_versions: BTreeMap<String, String> = from_str(crates_versions_data)?;
+    let crates_versions: BTreeMap<String, String> = if let Some(version) = cmd.version {
+        serde_json::from_str(get_version_mapping(&version))?
+    } else if let Some(branch) = cmd.branch {
+        get_branch_mapping(&cmd.git_server, &branch, &cmd.source).await?
+    } else {
+        return Err("Please specify only a version or a branch".into());
+    };
 
     update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
 

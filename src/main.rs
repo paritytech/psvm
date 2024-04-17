@@ -23,7 +23,8 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use toml_edit::DocumentMut;
-use versions::{get_branch_mapping, get_version_mapping};
+use versions::get_release_branches_versions;
+use versions::get_version_mapping_with_fallback;
 
 pub const DEFAULT_GIT_SERVER: &str = "https://raw.githubusercontent.com";
 
@@ -37,30 +38,17 @@ struct Command {
     #[clap(short, long, default_value = "Cargo.toml")]
     path: PathBuf,
 
-    /// Specifies the Polkadot SDK version.
-    #[clap(
-        short,
-        long,
-        conflicts_with = "branch",
-        required_unless_present = "branch"
-    )]
+    /// Specifies the Polkadot SDK version. Use '--list' flag to display available versions.
+    #[clap(short, long, required_unless_present = "list")]
     version: Option<String>,
 
-    /// Specifies a Polkadot SDK branch to get the versions. Can't be used at the same time as `version`.
-    #[clap(short, long)]
-    branch: Option<String>,
-
-    /// Specifies the source file to get the versions.
-    #[clap(short, long, value_parser = ["Cargo.lock", "Plan.toml"], default_value = "Plan.toml")]
-    source: String,
-
-    /// Overwrite local dependencies (using path).
+    /// Overwrite local dependencies (using path) with same name as the ones in the Polkadot SDK.
     #[clap(short, long)]
     overwrite: bool,
 
-    /// Specifies the git server to get the versions when using the `branch` flag.
-    #[clap(short, long, default_value = DEFAULT_GIT_SERVER)]
-    git_server: String,
+    /// List available versions.
+    #[clap(short, long)]
+    list: bool,
 }
 
 #[tokio::main]
@@ -68,16 +56,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let cmd = Command::parse();
 
+    if cmd.list {
+        let crates_versions = get_release_branches_versions().await?;
+        println!("Available versions:");
+        for version in crates_versions.iter() {
+            println!("- {}", version);
+        }
+        return Ok(());
+    }
+
+    let version = cmd.version.unwrap(); // Safe to unwrap due to `required_unless_present`
+
     let cargo_toml_path = validate_workspace_path(cmd.path)?;
 
     // Decide which branch data to use based on the branch name
-    let crates_versions: BTreeMap<String, String> = if let Some(version) = cmd.version {
-        serde_json::from_str(get_version_mapping(&version))?
-    } else if let Some(branch) = cmd.branch {
-        get_branch_mapping(&cmd.git_server, &branch, &cmd.source).await?
-    } else {
-        return Err("Please specify only a version or a branch".into());
-    };
+    let crates_versions: BTreeMap<String, String> =
+        get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &version).await?;
 
     update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
 
@@ -150,7 +144,7 @@ fn update_dependencies_impl(
     }
 }
 
-fn update_table_dependencies(
+pub fn update_table_dependencies(
     dep_table: &mut toml_edit::Table,
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,

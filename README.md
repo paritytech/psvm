@@ -1,6 +1,6 @@
 # Polkadot SDK Version Manager
 
-This is a simple tool to manage and update the Polkadot SDK dependencies in any Cargo.toml file. It [works offline](#offline) using a local version mapping previously fetched from the Polkadot SDK crates-io branches, and [works online](#online) by getting directly the versions from the Polkadot SDK crates-io branches (`Plan.toml` or `Cargo.lock`) files.
+This is a simple tool to manage and update the Polkadot SDK dependencies in any Cargo.toml file. It will automatically update the Polkadot SDK dependencies to their correct crates.io version.
 
 ## Installation
 
@@ -27,32 +27,20 @@ If you want to update the dependencies to a specific Polkadot SDK version, you c
 ```sh
 # Go to the directory containing the Cargo.toml file you want to update
 cd <cargo-toml-dir>
-# Run the psvm command to update the dependencies using PSVM local versions
-psvm
-# You can also update it using the path to the Cargo.toml file
-psvm -p <cargo-toml-dir>/Cargo.toml
-# Overwrite local dependencies with crates.io versions
-psvm -o
-# Update to a specific Polkadot SDK version (default 1.3.0) using PSVM local versions
-psvm -v "1.7.0"
-# Update to the versions defined in a specific Polkadot SDK branch Plan.toml file
-# i.e https://raw.githubusercontent.com/paritytech/polkadot-sdk/release-crates-io-v1.6.0/Plan.toml
-psvm -b "release-crates-io-v1.6.0"
-# Update to the versions defined in a specific Polkadot SDK branch Cargo.lock file
-# i.e https://raw.githubusercontent.com/paritytech/polkadot-sdk/release-crates-io-v1.3.0/Cargo.lock
-psvm -b "release-crates-io-v1.3.0" -s "Cargo.lock"
+# Update to a specific Polkadot SDK version
+psvm -v "1.3.0"
+# You can also update an specific Cargo.toml file by passing its path
+psvm -v "1.4.0" -p <cargo-toml-dir>/Cargo.toml
+# Overwrite local dependencies (with same name as Polkadot SDK crates) with crates.io versions
+psvm -v "1.7.0" -o
+# List all available Polkadot SDK versions
+psvm -l
 ```
 
-### Offline
+> Listing all available Polkadot SDK versions requires querying the GitHub API, so your IP may be rate-limited. If a rate limit is reached, the tool will fallback to the GitHub CLI to list the versions. Ensure you have the GitHub CLI installed and authenticated to avoid any issue.
 
-You can use PSVM offline with the `-v` or `--version` flag, cause PSVM keeps a local mapping (i.e. [v1.3.0 Mapping](/src/versions/release-crates-io-v1.3.0.json)) of the Polkadot SDK dependencies versions, that will be slowly updated. So be aware that the latest Polkadot SDK versions may not be available in the local mapping.
+## Workflow
 
-### Online
+To update a `Cargo.toml`, the tool will fetch the `Plan.toml` file (used to publish crates into crates.io) from the release branch in Polkadot SDK associated to the version input (`--version` argument), generate a mapping (crate -> version) filtering all crates that were not published (i.e. `publish = false`), and overwrite the input Cargo.toml file to match the version from the mapping (i.e [v1.6.0 `Plan.toml`](https://raw.githubusercontent.com/paritytech/polkadot-sdk/release-crates-io-v1.6.0/Plan.toml)).
 
-To have the latest versions, you can use the `-b` or `--branch` flag to fetch the versions from a specific Polkadot SDK branch. This will fetch the `Plan.toml` file (used to publish crates into crates.io) from the branch and update the local mapping with the versions defined in the file (i.e [v1.6.0 `Plan.toml`](https://raw.githubusercontent.com/paritytech/polkadot-sdk/release-crates-io-v1.6.0/Plan.toml)). However, this could not work for older branches (i.e. v1.3.0), cause the `Plan.toml` file may not exist. In this case, you can use the `-s` or `--source` flag to fetch the `Cargo.lock` file (i.e. [v1.3.0 `Cargo.lock`](https://raw.githubusercontent.com/paritytech/polkadot-sdk/release-crates-io-v1.3.0/Cargo.lock)) from the branch and update the local mapping with the versions defined in the file.
-
-## Maintenance  
-
-To update the Polkadot SDK dependencies mapping, run `./scripts/update.sh <polkadot-sdk repo path>`. This will update the dependencies `json` files located in `src/versions` with the latest versions defined in Polkadot SDK crates-io branches.
-
-You can add more branches in the `BRANCHES` list from `./scripts/update.sh` file. Once you have process the branches, you need to index them in the `src/versions.rs` file.
+In specific versions, the `Plan.toml` file may not exists (i.e. v1.3.0). In this case, the tool will fallback to the `Cargo.lock` file (i.e. [v1.3.0 `Cargo.lock`](https://raw.githubusercontent.com/paritytech/polkadot-sdk/release-crates-io-v1.3.0/Cargo.lock)) from the branch, generate a mapping using this file and overwrite the input Cargo.toml file to match the version from the mapping. The only concern to be aware in this scenario is that the `Cargo.lock` file may contain dependencies that are not published in crates.io, and the tool will not be able to filter them out cause it is not possible to determine if a crate is published or not (with this file). If you have a local dependency with a name similar to a crate not published, the tool will overwrite it, so be careful. Currently, this only happens with v1.3.0, but as the branches can change at any time, it is important to be aware of this. The tool will alert with a message "Failed to get Plan.toml, falling back to Cargo.lock." if this happens.

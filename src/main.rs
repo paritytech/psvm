@@ -18,13 +18,15 @@ mod versions;
 
 use clap::Parser;
 use env_logger::Env;
-use serde_json::from_str;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use toml_edit::DocumentMut;
-use versions::get_version_mapping;
+use versions::get_release_branches_versions;
+use versions::get_version_mapping_with_fallback;
+
+pub const DEFAULT_GIT_SERVER: &str = "https://raw.githubusercontent.com";
 
 /// Polkadot SDK Version Manager.
 ///
@@ -36,25 +38,40 @@ struct Command {
     #[clap(short, long, default_value = "Cargo.toml")]
     path: PathBuf,
 
-    /// Specifies the Polkadot SDK version.
-    #[clap(short, long)]
-    version: String,
+    /// Specifies the Polkadot SDK version. Use '--list' flag to display available versions.
+    #[clap(short, long, required_unless_present = "list")]
+    version: Option<String>,
 
-    /// Overwrite local dependencies (using path).
+    /// Overwrite local dependencies (using path) with same name as the ones in the Polkadot SDK.
     #[clap(short, long)]
     overwrite: bool,
+
+    /// List available versions.
+    #[clap(short, long)]
+    list: bool,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let cmd = Command::parse();
+
+    if cmd.list {
+        let crates_versions = get_release_branches_versions().await?;
+        println!("Available versions:");
+        for version in crates_versions.iter() {
+            println!("- {}", version);
+        }
+        return Ok(());
+    }
+
+    let version = cmd.version.unwrap(); // Safe to unwrap due to `required_unless_present`
 
     let cargo_toml_path = validate_workspace_path(cmd.path)?;
 
     // Decide which branch data to use based on the branch name
-    let crates_versions_data = get_version_mapping(&cmd.version);
-
-    let crates_versions: BTreeMap<String, String> = from_str(crates_versions_data)?;
+    let crates_versions: BTreeMap<String, String> =
+        get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &version).await?;
 
     update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
 
@@ -127,7 +144,7 @@ fn update_dependencies_impl(
     }
 }
 
-fn update_table_dependencies(
+pub fn update_table_dependencies(
     dep_table: &mut toml_edit::Table,
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,

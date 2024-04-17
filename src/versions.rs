@@ -22,6 +22,7 @@ pub fn get_version_mapping(version: &str) -> &'static str {
         "1.7.0" => include_str!("versions/release-crates-io-v1.7.0.json"),
         "1.8.0" => include_str!("versions/release-crates-io-v1.8.0.json"),
         "1.9.0" => include_str!("versions/release-crates-io-v1.9.0.json"),
+        "1.10.0" => include_str!("versions/release-crates-io-v1.10.0.json"),
         _ => panic!("Version {} not available", version),
     }
 }

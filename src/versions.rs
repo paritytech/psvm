@@ -186,10 +186,10 @@ pub async fn get_release_branches_versions() -> Result<Vec<String>, Box<dyn std:
 pub async fn get_parity_crate_owner_crates() -> Result<HashSet<String>, Box<dyn std::error::Error>> {
     let mut crates = HashSet::new();
 
-    for page in 1..=10 { // Currently there's 7 pages
+    for page in 1..=10 { // Currently there are 7 pages (so this at most 1s)
         let response = reqwest::Client::new()
             .get(format!(
-                "https://crates.io/api/v1/crates?page={}&per_page=100&user_id=150167",
+                "https://crates.io/api/v1/crates?page={}&per_page=100&user_id=150167", // parity-crate-owner 
                 page
             ))
             .header("User-Agent", "reqwest")

@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use serde::Deserialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Debug, Deserialize)]
 struct CargoLock {
@@ -29,16 +29,17 @@ struct Package {
 }
 
 #[derive(Debug, Deserialize)]
-struct PlanToml {
+pub struct PlanToml {
     #[serde(rename = "crate")]
-    crates: Vec<Crate>,
+    pub crates: Vec<Crate>,
 }
 
 #[derive(Debug, Deserialize)]
-struct Crate {
-    name: String,
-    to: String,
-    publish: Option<bool>,
+pub struct Crate {
+    pub name: String,
+    pub to: String,
+    pub from: String,
+    pub publish: Option<bool>,
 }
 
 pub async fn get_version_mapping_with_fallback(
@@ -75,7 +76,7 @@ pub async fn get_version_mapping(
 
     match source {
         "Cargo.lock" => get_cargo_packages(&content),
-        "Plan.toml" => get_plan_packages(&content),
+        "Plan.toml" => get_plan_packages(&content).await,
         _ => panic!("Unknown source: {}", source),
     }
 }
@@ -96,16 +97,27 @@ fn get_cargo_packages(
     Ok(cargo_packages)
 }
 
-fn get_plan_packages(
+async fn get_plan_packages(
     content: &str,
 ) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error>> {
     let plan_toml: PlanToml = toml::from_str(content)?;
+
+    let parity_owned_crates = get_parity_crate_owner_crates().await?;
 
     // Filter local packages and collect them into a JSON object
     let plan_packages: BTreeMap<_, _> = plan_toml
         .crates
         .into_iter()
-        .filter(|pkg| pkg.publish.unwrap_or(true))
+        .filter(|pkg| {
+            pkg.publish.unwrap_or(true) || {
+                let placeholder = pkg.to == "0.0.0" && pkg.from == "0.0.0";
+                let public_not_in_release = parity_owned_crates.contains(&pkg.name) && !placeholder;
+                if public_not_in_release {
+                    log::info!("Adding public crate not in release {}: {} -> {}", pkg.name, pkg.from, pkg.to);
+                }
+                public_not_in_release
+            }
+        })
         .map(|pkg| (pkg.name, pkg.to))
         .collect();
 
@@ -169,4 +181,40 @@ pub async fn get_release_branches_versions() -> Result<Vec<String>, Box<dyn std:
     }
 
     Ok(release_branches)
+}
+
+pub async fn get_parity_crate_owner_crates() -> Result<HashSet<String>, Box<dyn std::error::Error>> {
+    let mut crates = HashSet::new();
+
+    for page in 1..=10 { // Currently there's 7 pages
+        let response = reqwest::Client::new()
+            .get(format!(
+                "https://crates.io/api/v1/crates?page={}&per_page=100&user_id=150167",
+                page
+            ))
+            .header("User-Agent", "reqwest")
+            .header("Accept", "application/vnd.github.v3+json")
+            .send()
+            .await?;
+
+        let output = response.text().await?;
+
+        let crates_data: serde_json::Value = serde_json::from_str(&output)?;
+
+        let crate_names = crates_data["crates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|crate_data| crate_data["id"].as_str().unwrap_or_default().to_string());
+
+        let crates_len = crate_names.len();
+
+        crates.extend(crate_names);
+
+        if crates_len < 100 {
+            break;
+        }
+    }
+
+    Ok(crates)
 }

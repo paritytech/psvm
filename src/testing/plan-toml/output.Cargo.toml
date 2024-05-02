@@ -68,7 +68,7 @@ cumulus-pallet-xcm = { version = "0.6.0", default-features = false }
 cumulus-pallet-xcmp-queue = { version = "0.6.0", default-features = false }
 cumulus-primitives-core = { version = "0.6.0", default-features = false }
 cumulus-primitives-utility = { version = "0.6.2", default-features = false }
-pallet-collator-selection = { version = "8.0.0", default-features = false }
+pallet-collator-selection = { version = "8.0.2", default-features = false }
 parachain-info = { version = "0.6.0", package = "staging-parachain-info", default-features = false }
 
 [features]

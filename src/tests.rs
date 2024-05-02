@@ -31,7 +31,7 @@ mod tests {
         let result =
             crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false)
                 .unwrap();
-            
+
         // Assert that the result matches the expected output
         assert_eq!(result, Some(expected_cargo_toml.into()));
     }

@@ -113,7 +113,12 @@ async fn get_plan_packages(
                 let placeholder = pkg.to == "0.0.0" && pkg.from == "0.0.0";
                 let public_not_in_release = parity_owned_crates.contains(&pkg.name) && !placeholder;
                 if public_not_in_release {
-                    log::info!("Adding public crate not in release {}: {} -> {}", pkg.name, pkg.from, pkg.to);
+                    log::info!(
+                        "Adding public crate not in release {}: {} -> {}",
+                        pkg.name,
+                        pkg.from,
+                        pkg.to
+                    );
                 }
                 public_not_in_release
             }
@@ -183,13 +188,15 @@ pub async fn get_release_branches_versions() -> Result<Vec<String>, Box<dyn std:
     Ok(release_branches)
 }
 
-pub async fn get_parity_crate_owner_crates() -> Result<HashSet<String>, Box<dyn std::error::Error>> {
+pub async fn get_parity_crate_owner_crates() -> Result<HashSet<String>, Box<dyn std::error::Error>>
+{
     let mut crates = HashSet::new();
 
-    for page in 1..=10 { // Currently there are 7 pages (so this at most 1s)
+    for page in 1..=10 {
+        // Currently there are 7 pages (so this at most 1s)
         let response = reqwest::Client::new()
             .get(format!(
-                "https://crates.io/api/v1/crates?page={}&per_page=100&user_id=150167", // parity-crate-owner 
+                "https://crates.io/api/v1/crates?page={}&per_page=100&user_id=150167", // parity-crate-owner
                 page
             ))
             .header("User-Agent", "reqwest")

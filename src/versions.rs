@@ -216,7 +216,7 @@ pub async fn get_parity_crate_owner_crates() -> Result<HashSet<String>, Box<dyn 
         let crates_len = crates.len();
 
         let crate_names = crates
-            .filter(|crate_data| crate_data["max_version"].as_str().unwrap_or_default().to_string() != "0.0.0")
+            .filter(|crate_data| crate_data["max_version"].as_str().unwrap_or_default() != "0.0.0")
             .map(|crate_data| crate_data["id"].as_str().unwrap_or_default().to_string());
 
         parity_crates.extend(crate_names);

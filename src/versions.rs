@@ -190,7 +190,7 @@ pub async fn get_release_branches_versions() -> Result<Vec<String>, Box<dyn std:
 
 pub async fn get_parity_crate_owner_crates() -> Result<HashSet<String>, Box<dyn std::error::Error>>
 {
-    let mut crates = HashSet::new();
+    let mut parity_crates = HashSet::new();
 
     for page in 1..=10 {
         // Currently there are 7 pages (so this at most 1s)
@@ -208,20 +208,23 @@ pub async fn get_parity_crate_owner_crates() -> Result<HashSet<String>, Box<dyn 
 
         let crates_data: serde_json::Value = serde_json::from_str(&output)?;
 
-        let crate_names = crates_data["crates"]
+        let crates = crates_data["crates"]
             .as_array()
             .unwrap()
-            .iter()
+            .iter();
+
+        let crates_len = crates.len();
+
+        let crate_names = crates
+            .filter(|crate_data| crate_data["max_version"].as_str().unwrap_or_default() != "0.0.0")
             .map(|crate_data| crate_data["id"].as_str().unwrap_or_default().to_string());
 
-        let crates_len = crate_names.len();
-
-        crates.extend(crate_names);
+        parity_crates.extend(crate_names);
 
         if crates_len < 100 {
             break;
         }
     }
 
-    Ok(crates)
+    Ok(parity_crates)
 }

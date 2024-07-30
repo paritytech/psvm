@@ -56,15 +56,26 @@ pub async fn get_version_mapping_with_fallback(
     }
 }
 
+fn version_to_url(
+    base_url: &str,
+    version: &str,
+    source: &str,
+) -> String {
+    let version = if version.starts_with("stable") {
+        version.into()
+    } else {
+        format!("release-crates-io-v{}", version)
+    };
+
+    format!("{}/paritytech/polkadot-sdk/{}/{}", base_url, version, source)
+}
+
 pub async fn get_version_mapping(
     base_url: &str,
     version: &str,
     source: &str,
 ) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error>> {
-    let url = format!(
-        "{}/paritytech/polkadot-sdk/release-crates-io-v{}/{}",
-        base_url, version, source
-    );
+    let url = version_to_url(base_url, version, source);
     let response = reqwest::Client::new()
         .get(&url)
         .header("User-Agent", "reqwest")

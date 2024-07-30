@@ -75,7 +75,7 @@ pub async fn get_version_mapping(
     version: &str,
     source: &str,
 ) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error>> {
-    let url = version_to_url(version, base_url, source);
+    let url = version_to_url(base_url, version, source);
     let response = reqwest::Client::new()
         .get(&url)
         .header("User-Agent", "reqwest")

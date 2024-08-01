@@ -18,7 +18,10 @@ env_logger = "0.11.3"
 reqwest = { version = "0.12.3", features = ["json"] }
 toml = "0.8.12"
 tokio = { version = "1.37.0", features = ["full"] }
+frame-benchmarking = { version = "25.0.0", default-features = false, optional = true }
 
 [dev-dependencies]
+pallet-balances = { version = "25.0.0" }
+pallet-transaction-payment = { version = "25.0.0" }
 tokio-test = "0.4"
 mockito = "0.30"

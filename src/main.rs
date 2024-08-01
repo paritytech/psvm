@@ -13,16 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod check_deps;
 mod tests;
+mod update_deps;
+mod utils;
 mod versions;
 
+use check_deps::check_dependencies;
 use clap::Parser;
 use env_logger::Env;
-use std::collections::BTreeMap;
-use std::fs;
-use std::path::Path;
 use std::path::PathBuf;
-use toml_edit::DocumentMut;
+use update_deps::update_dependencies;
+use utils::validate_workspace_path;
 use versions::get_release_branches_versions;
 use versions::get_version_mapping_with_fallback;
 
@@ -39,8 +41,22 @@ struct Command {
     path: PathBuf,
 
     /// Specifies the Polkadot SDK version. Use '--list' flag to display available versions.
-    #[clap(short, long, required_unless_present = "list")]
+    #[clap(
+        short,
+        long,
+        required_unless_present = "list",
+        required_unless_present = "check"
+    )]
     version: Option<String>,
+
+    /// Checks if deps have the same version as the specified Polkadot SDK version.
+    #[clap(
+        short,
+        long,
+        required_unless_present = "version",
+        required_unless_present = "list"
+    )]
+    check: Option<String>,
 
     /// Overwrite local dependencies (using path) with same name as the ones in the Polkadot SDK.
     #[clap(short, long)]
@@ -56,153 +72,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let cmd = Command::parse();
 
-    if cmd.list {
-        let crates_versions = get_release_branches_versions().await?;
-        println!("Available versions:");
-        for version in crates_versions.iter() {
-            println!("- {}", version);
+    match cmd {
+        Command { list: true, .. } => {
+            let crates_versions = get_release_branches_versions().await?;
+            println!("Available versions:");
+            for version in crates_versions.iter() {
+                println!("- {}", version);
+            }
         }
-        return Ok(());
-    }
-
-    let version = cmd.version.unwrap(); // Safe to unwrap due to `required_unless_present`
-
-    let cargo_toml_path = validate_workspace_path(cmd.path)?;
-
-    // Decide which branch data to use based on the branch name
-    let crates_versions: BTreeMap<String, String> =
-        get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &version).await?;
-
-    update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
-
-    Ok(())
-}
-
-fn validate_workspace_path(mut path: PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    if path.is_dir() {
-        path = path.join("Cargo.toml");
-    }
-
-    if !path.exists() {
-        return Err(format!(
-            "Could not find workspace root Cargo.toml file at {}",
-            path.display()
-        )
-        .into());
-    }
-
-    Ok(path)
-}
-
-fn update_dependencies(
-    cargo_toml_path: &Path,
-    crates_versions: &BTreeMap<String, String>,
-    overwrite: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let cargo_toml = update_dependencies_impl(cargo_toml_path, crates_versions, overwrite)?;
-
-    match cargo_toml {
-        Some(new_content) => {
-            fs::write(cargo_toml_path, new_content)?;
-            println!("Updated dependencies in {}", cargo_toml_path.display());
+        Command {
+            version: Some(version),
+            ..
+        } => {
+            let cargo_toml_path = validate_workspace_path(cmd.path)?;
+            let crates_versions =
+                get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &version).await?;
+            update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
         }
-        None => {
-            println!(
-                "Dependencies in {} are already up to date",
-                cargo_toml_path.display()
-            );
+        Command {
+            check: Some(check_version),
+            ..
+        } => {
+            let cargo_toml_path = validate_workspace_path(cmd.path)?;
+            let crates_versions =
+                get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &check_version).await?;
+            // Here, you might want to check dependency versions without updating them
+            check_dependencies(&cargo_toml_path, &crates_versions, false)?;
+        }
+        _ => {
+            return Err("Invalid flag. Use '--help' to display available flags.".into());
         }
     }
 
     Ok(())
-}
-
-fn update_dependencies_impl(
-    cargo_toml_path: &Path,
-    crates_versions: &BTreeMap<String, String>,
-    overwrite: bool,
-) -> Result<Option<String>, Box<dyn std::error::Error>> {
-    let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
-    let mut cargo_toml: DocumentMut = cargo_toml_content.parse()?;
-    // Check if cargo workspace is defined
-    let deps = match cargo_toml.as_table_mut().get_mut("workspace") {
-        Some(toml_edit::Item::Table(table)) => table,
-        _ => cargo_toml.as_table_mut(),
-    };
-
-    for table in ["dependencies", "dev-dependencies", "build-dependencies"].iter() {
-        if let Some(toml_edit::Item::Table(dep_table)) = deps.get_mut(table) {
-            update_table_dependencies(dep_table, crates_versions, overwrite);
-        }
-    }
-
-    let new_content = cargo_toml.to_string();
-    if new_content != cargo_toml_content {
-        Ok(Some(new_content))
-    } else {
-        Ok(None)
-    }
-}
-
-pub fn update_table_dependencies(
-    dep_table: &mut toml_edit::Table,
-    crates_versions: &BTreeMap<String, String>,
-    overwrite: bool,
-) {
-    for (dep_key, dep_value) in dep_table.iter_mut() {
-        let dep_key_str = dep_key.get();
-
-        // account for dep renaming:
-        let lookup_key = if let Some(table) = dep_value.as_table_like() {
-            table
-                .get("package")
-                .and_then(|p| p.as_str())
-                .unwrap_or(dep_key_str)
-        } else {
-            dep_key_str
-        };
-
-        let Some(crate_version) = crates_versions.get(lookup_key) else {
-            log::debug!("Could not find version for {}", lookup_key);
-            continue;
-        };
-
-        if let Some(table) = dep_value.as_table_like_mut() {
-            if !overwrite && table.get("path").is_some() {
-                continue;
-            }
-
-            table.remove("git");
-            table.remove("rev");
-            table.remove("branch");
-            table.remove("tag");
-            table.remove("path");
-
-            let mut new_table = toml_edit::InlineTable::default();
-
-            // Directly create a `toml_edit::Value` for the version
-            new_table.get_or_insert(
-                "version",
-                toml_edit::value(crate_version.clone()).as_value().unwrap(),
-            );
-
-            for (key, value) in table.iter() {
-                // Ensure we're inserting `Value`s, not `Item`s
-                if key != "version" && value.is_value() {
-                    new_table.get_or_insert(key, value.as_value().unwrap().clone());
-                }
-            }
-            new_table.fmt();
-
-            // Replace the original table-like item with the new inline table
-            *dep_value = toml_edit::Item::Value(toml_edit::Value::InlineTable(new_table));
-        } else if dep_value.is_str() {
-            *dep_value = toml_edit::value(crate_version.clone());
-        } else {
-            log::error!("Unexpected dependency value type for {}", dep_key_str);
-            continue;
-        }
-
-        log::debug!("Setting {} to {}", dep_key_str, crate_version);
-    }
 }

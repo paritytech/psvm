@@ -56,18 +56,17 @@ pub async fn get_version_mapping_with_fallback(
     }
 }
 
-fn version_to_url(
-    base_url: &str,
-    version: &str,
-    source: &str,
-) -> String {
+fn version_to_url(base_url: &str, version: &str, source: &str) -> String {
     let version = if version.starts_with("stable") {
         version.into()
     } else {
         format!("release-crates-io-v{}", version)
     };
 
-    format!("{}/paritytech/polkadot-sdk/{}/{}", base_url, version, source)
+    format!(
+        "{}/paritytech/polkadot-sdk/{}/{}",
+        base_url, version, source
+    )
 }
 
 pub async fn get_version_mapping(
@@ -219,10 +218,7 @@ pub async fn get_parity_crate_owner_crates() -> Result<HashSet<String>, Box<dyn 
 
         let crates_data: serde_json::Value = serde_json::from_str(&output)?;
 
-        let crates = crates_data["crates"]
-            .as_array()
-            .unwrap()
-            .iter();
+        let crates = crates_data["crates"].as_array().unwrap().iter();
 
         let crates_len = crates.len();
 

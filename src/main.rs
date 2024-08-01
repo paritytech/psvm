@@ -96,8 +96,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let cargo_toml_path = validate_workspace_path(cmd.path)?;
             let crates_versions =
                 get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &check_version).await?;
-            // Here, you might want to check dependency versions without updating them
-            check_dependencies(&cargo_toml_path, &crates_versions, false)?;
+            // Here, you check dependency versions without updating them in the Cargo.toml
+            check_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
         }
         _ => {
             return Err("Invalid flag. Use '--help' to display available flags.".into());

@@ -107,9 +107,9 @@ fn update_dependencies(
     cargo_toml_path: &Path,
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
-    update: bool,
+    only_check: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let cargo_toml = update_dependencies_impl(cargo_toml_path, crates_versions, overwrite, update)?;
+    let cargo_toml = update_dependencies_impl(cargo_toml_path, crates_versions, overwrite, only_check)?;
 
     match cargo_toml {
         Some(new_content) => {
@@ -131,7 +131,7 @@ fn update_dependencies_impl(
     cargo_toml_path: &Path,
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
-    update: bool,
+    only_check: bool,
 ) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
     let mut cargo_toml: DocumentMut = cargo_toml_content.parse()?;
@@ -149,10 +149,10 @@ fn update_dependencies_impl(
 
     let new_content = cargo_toml.to_string();
     if new_content != cargo_toml_content {
-        if update {
-            return Ok(Some(new_content));
+        if only_check {
+            Ok(Some(new_content))
         } else {
-            return Err("Dependencies are not up to date".into());
+            Err("Dependencies are not up to date".into())
         }
     } else {
         Ok(None)

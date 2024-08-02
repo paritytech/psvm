@@ -41,16 +41,11 @@ struct Command {
     path: PathBuf,
 
     /// Specifies the Polkadot SDK version. Use '--list' flag to display available versions.
-    #[clap(
-        short,
-        long,
-        required_unless_present = "list",
-        required_unless_present = "check"
-    )]
+    #[clap(short, long, required_unless_present = "list")]
     version: Option<String>,
 
     /// Checks if deps have the same version as the specified Polkadot SDK version.
-    #[clap(short,long,)]
+    #[clap(short, long)]
     check: bool,
 
     /// Overwrite local dependencies (using path) with same name as the ones in the Polkadot SDK.

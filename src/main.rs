@@ -50,13 +50,8 @@ struct Command {
     version: Option<String>,
 
     /// Checks if deps have the same version as the specified Polkadot SDK version.
-    #[clap(
-        short,
-        long,
-        required_unless_present = "version",
-        required_unless_present = "list"
-    )]
-    check: Option<String>,
+    #[clap(short,long,)]
+    check: bool,
 
     /// Overwrite local dependencies (using path) with same name as the ones in the Polkadot SDK.
     #[clap(short, long)]
@@ -87,17 +82,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let cargo_toml_path = validate_workspace_path(cmd.path)?;
             let crates_versions =
                 get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &version).await?;
-            update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
-        }
-        Command {
-            check: Some(check_version),
-            ..
-        } => {
-            let cargo_toml_path = validate_workspace_path(cmd.path)?;
-            let crates_versions =
-                get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &check_version).await?;
-            // Here, you check dependency versions without updating them in the Cargo.toml
-            check_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
+            if cmd.check {
+                check_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
+            } else {
+                update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
+            }
         }
         _ => {
             return Err("Invalid flag. Use '--help' to display available flags.".into());

@@ -16,7 +16,7 @@
 #[cfg(test)]
 mod tests {
     use crate::versions::get_version_mapping_with_fallback;
-    use std::path::Path;
+    use std::{error::Error, path::Path};
 
     async fn verify_version_mapping(
         version: &str,
@@ -29,11 +29,26 @@ mod tests {
 
         // Call the refactored logic function with the test data
         let result =
-            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false)
+            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, true)
                 .unwrap();
 
         // Assert that the result matches the expected output
         assert_eq!(result, Some(expected_cargo_toml.into()));
+    }
+
+    async fn verify_version_checking(
+        version: &str,
+        input_cargo_toml_path: &Path,
+    ) -> Result<Option<String>, Box<dyn Error>> {
+        let crates_versions = get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, version)
+            .await
+            .unwrap();
+
+        // Call the refactored logic function with the test data
+        let result =
+            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, false);
+
+        result
     }
 
     #[tokio::test]
@@ -45,6 +60,50 @@ mod tests {
         let version = "1.3.0";
 
         verify_version_mapping(version, input_cargo_toml_path, expected_cargo_toml).await;
+    }
+
+    #[tokio::test]
+    // cargo psvm -v 1.14.0 -c
+    // This version doesn't have the Plan.toml file, so it will fallback to Cargo.lock
+    // and check if the versions in the local toml file comply with the Cargo.lock file
+    async fn test_check_version_without_fallback_passes() {
+        let input_cargo_toml_path = Path::new("src/testing/plan-toml/check.Cargo.toml");
+        let version = "1.14.0";
+
+        let res = verify_version_checking(version, input_cargo_toml_path).await;
+        assert!(res.is_ok());
+        assert!(res.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    // cargo psvm -v 1.4.0 -c
+    // This version doesn't have the Plan.toml file, so it will fallback to Cargo.lock
+    // and check if the versions in the local toml file comply with the Cargo.lock file.
+    // This will fail because the Cargo.toml file has version 1.14.0 while we are checking
+    // against 1.4.0
+    async fn test_check_version_without_fallback_fails_with_incorrect_version() {
+        let input_cargo_toml_path = Path::new("src/testing/plan-toml/check.Cargo.toml");
+        let version = "1.4.0";
+
+        let res = verify_version_checking(version, input_cargo_toml_path).await;
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "Dependencies are not up to date"
+        );
+    }
+
+    #[tokio::test]
+    // cargo psvm -v 1.3.0 -c
+    // This version doesn't have the Plan.toml file, so it will fallback to Cargo.lock
+    // and check if the versions in the local toml file comply with the Cargo.lock file
+    async fn test_check_version_with_fallback_passes() {
+        let input_cargo_toml_path = Path::new("src/testing/cargo-lock/output.Cargo.toml");
+        let version = "1.3.0";
+
+        let res = verify_version_checking(version, input_cargo_toml_path).await;
+        assert!(res.is_ok());
+        assert!(res.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -167,9 +226,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
             );
 
             let input_cargo_toml_path = Path::new("src/testing/plan-toml/input.Cargo.toml");
-            let result =
-                crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false)
-                    .unwrap();
+            let result = crate::update_dependencies_impl(
+                &input_cargo_toml_path,
+                &crates_versions,
+                false,
+                true,
+            )
+            .unwrap();
 
             assert!(result.is_some()); // If no changes are made, the result will be None
         }

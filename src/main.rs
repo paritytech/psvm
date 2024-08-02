@@ -49,6 +49,10 @@ struct Command {
     /// List available versions.
     #[clap(short, long)]
     list: bool,
+
+    /// Check if the dependencies versions match the Polkadot SDK version. Does not update the Cargo.toml
+    #[clap(short, long)]
+    check: bool,
 }
 
 #[tokio::main]
@@ -73,7 +77,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let crates_versions: BTreeMap<String, String> =
         get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &version).await?;
 
-    update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite)?;
+    update_dependencies(
+        &cargo_toml_path,
+        &crates_versions,
+        cmd.overwrite,
+        !cmd.check,
+    )?;
 
     Ok(())
 }
@@ -98,8 +107,9 @@ fn update_dependencies(
     cargo_toml_path: &Path,
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
+    only_check: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let cargo_toml = update_dependencies_impl(cargo_toml_path, crates_versions, overwrite)?;
+    let cargo_toml = update_dependencies_impl(cargo_toml_path, crates_versions, overwrite, only_check)?;
 
     match cargo_toml {
         Some(new_content) => {
@@ -121,6 +131,7 @@ fn update_dependencies_impl(
     cargo_toml_path: &Path,
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
+    only_check: bool,
 ) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
     let mut cargo_toml: DocumentMut = cargo_toml_content.parse()?;
@@ -138,7 +149,11 @@ fn update_dependencies_impl(
 
     let new_content = cargo_toml.to_string();
     if new_content != cargo_toml_content {
-        Ok(Some(new_content))
+        if only_check {
+            Ok(Some(new_content))
+        } else {
+            Err("Dependencies are not up to date".into())
+        }
     } else {
         Ok(None)
     }

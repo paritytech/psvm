@@ -81,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &cargo_toml_path,
         &crates_versions,
         cmd.overwrite,
-        !cmd.check,
+        cmd.check,
     )?;
 
     Ok(())
@@ -150,9 +150,9 @@ fn update_dependencies_impl(
     let new_content = cargo_toml.to_string();
     if new_content != cargo_toml_content {
         if only_check {
-            Ok(Some(new_content))
-        } else {
             Err("Dependencies are not up to date".into())
+        } else {
+            Ok(Some(new_content))
         }
     } else {
         Ok(None)

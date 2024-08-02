@@ -29,7 +29,7 @@ mod tests {
 
         // Call the refactored logic function with the test data
         let result =
-            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, true)
+            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, false)
                 .unwrap();
 
         // Assert that the result matches the expected output
@@ -46,7 +46,7 @@ mod tests {
 
         // Call the refactored logic function with the test data
         let result =
-            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, false);
+            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, true);
 
         result
     }
@@ -230,7 +230,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
                 &input_cargo_toml_path,
                 &crates_versions,
                 false,
-                true,
+                false,
             )
             .unwrap();
 

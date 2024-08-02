@@ -77,7 +77,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let crates_versions: BTreeMap<String, String> =
         get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &version).await?;
 
-    update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite, !cmd.check)?;
+    update_dependencies(
+        &cargo_toml_path,
+        &crates_versions,
+        cmd.overwrite,
+        !cmd.check,
+    )?;
 
     Ok(())
 }
@@ -102,7 +107,7 @@ fn update_dependencies(
     cargo_toml_path: &Path,
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
-    update: bool
+    update: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let cargo_toml = update_dependencies_impl(cargo_toml_path, crates_versions, overwrite, update)?;
 
@@ -126,7 +131,7 @@ fn update_dependencies_impl(
     cargo_toml_path: &Path,
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
-    update: bool
+    update: bool,
 ) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
     let mut cargo_toml: DocumentMut = cargo_toml_content.parse()?;

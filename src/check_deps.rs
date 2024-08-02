@@ -8,7 +8,7 @@ pub fn check_dependencies(
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let _ = check_dependencies_impl(cargo_toml_path, crates_versions, overwrite)?;
+    check_dependencies_impl(cargo_toml_path, crates_versions, overwrite)?;
     log::info!(
         "Checked for dependencies in {}. All Up-to-date!",
         cargo_toml_path.display()
@@ -50,7 +50,7 @@ fn check_table_dependencies(
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
 ) -> Result<bool, Box<dyn std::error::Error>> {
-    let mut local_toml_version: &str = "";
+    let mut local_toml_version: &str;
     let mut has_mismatch = false;
     for (dep_key, dep_value) in dep_table.iter_mut() {
         let dep_key_str = dep_key.get();
@@ -71,7 +71,7 @@ fn check_table_dependencies(
             let local_toml_version_option = table.get("version");
             if local_toml_version_option.is_none() {
                 log::error!("Dependency format invalid for {}", dep_key_str);
-                return Err(format!("Invalid Dependency Format").into());
+                return Err("Invalid Dependency Format".into());
             } else {
                 local_toml_version = local_toml_version_option.unwrap().as_str().unwrap();
             }

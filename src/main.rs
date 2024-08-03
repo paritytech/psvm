@@ -25,6 +25,7 @@ use std::path::PathBuf;
 use toml_edit::DocumentMut;
 use versions::get_release_branches_versions;
 use versions::get_version_mapping_with_fallback;
+use versions::Repository;
 
 pub const DEFAULT_GIT_SERVER: &str = "https://raw.githubusercontent.com";
 
@@ -53,6 +54,10 @@ struct Command {
     /// Check if the dependencies versions match the Polkadot SDK version. Does not update the Cargo.toml
     #[clap(short, long)]
     check: bool,
+
+    /// To either list available ORML versions or update the Cargo.toml file with corresponding ORML versions.
+    #[clap(short('O'), long)]
+    orml: bool
 }
 
 #[tokio::main]
@@ -61,7 +66,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cmd = Command::parse();
 
     if cmd.list {
-        let crates_versions = get_release_branches_versions().await?;
+        let crates_versions: Vec<String>;
+        if cmd.orml {
+            crates_versions = get_release_branches_versions(Repository::ORML).await?;
+        } else {
+            crates_versions = get_release_branches_versions(Repository::PSDK).await?;
+        }
         println!("Available versions:");
         for version in crates_versions.iter() {
             println!("- {}", version);
@@ -221,3 +231,6 @@ pub fn update_table_dependencies(
         log::debug!("Setting {} to {}", dep_key_str, crate_version);
     }
 }
+
+
+// orml-tokens = { git = "https://github.com/open-web3-stack/open-runtime-module-library", branch = "release-polkadot-v1.1.0", default-features = false }

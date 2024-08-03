@@ -145,13 +145,46 @@ struct Branch {
     name: String,
 }
 
-pub async fn get_release_branches_versions() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+#[derive(Default)]
+struct RepositoryInfo {
+    branches_url: String,
+    gh_cmd_url: String,
+    version_filter_string: String,
+    version_replace_string: String
+}
+
+pub enum Repository {
+    /// The official ORML repository
+    ORML,
+    /// The official Polkadot SDK repository
+    PSDK
+}
+
+fn get_repository_info(repository: &Repository) -> RepositoryInfo {
+    match repository {
+        Repository::ORML => RepositoryInfo {
+            branches_url: "https://api.github.com/repos/open-web3-stack/open-runtime-module-library/branches?per_page=100&page=".into(),
+            gh_cmd_url: "/repos/open-web3-stack/open-runtime-module-library/branches?per_page=100&page=".into(),
+            version_filter_string: "polkadot-v1".into(),
+            version_replace_string: "polkadot-v".into()
+        },
+        Repository::PSDK => RepositoryInfo {
+            branches_url: "https://api.github.com/repos/paritytech/polkadot-sdk/branches?per_page=100&page=".into(),
+            gh_cmd_url: "/repos/paritytech/polkadot-sdk/branches/per_page=100&page={}".into(),
+            version_filter_string: "release-crates-io-v".into(),
+            version_replace_string: "release-crates-io-v".into()
+        },
+    }
+}
+
+pub async fn get_release_branches_versions(repository: Repository) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut release_branches = vec![];
+    let repository_info = get_repository_info(&repository);
 
     for page in 1..100 {
         // currently there's 5 pages, so 100 should be enough
         let response = reqwest::Client::new()
-        .get(format!("https://api.github.com/repos/paritytech/polkadot-sdk/branches?per_page=100&page={}", page))
+        .get(format!("{}{}",repository_info.branches_url, page))
         .header("User-Agent", "reqwest")
         .header("Accept", "application/vnd.github.v3+json")
         .send()
@@ -170,8 +203,8 @@ pub async fn get_release_branches_versions() -> Result<Vec<String>, Box<dyn std:
                         "-H",
                         "X-GitHub-Api-Version: 2022-11-28",
                         &format!(
-                            "/repos/paritytech/polkadot-sdk/branches?per_page=100&page={}",
-                            page
+                            "{}{}",
+                            repository_info.gh_cmd_url, page
                         ),
                     ])
                     .output()?
@@ -183,8 +216,9 @@ pub async fn get_release_branches_versions() -> Result<Vec<String>, Box<dyn std:
 
         let version_branches = branches
             .iter()
-            .filter(|b| b.name.starts_with("release-crates-io-v"))
-            .map(|branch| branch.name.replace("release-crates-io-v", ""));
+            .filter(|b| b.name.starts_with(&repository_info.version_filter_string))
+            .filter(|b| !(b.name == "polkadot-v1.0.0"))
+            .map(|branch| branch.name.replace(&repository_info.version_replace_string, ""));
 
         release_branches = release_branches
             .into_iter()

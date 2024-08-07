@@ -30,7 +30,7 @@ mod tests {
 
         // Call the refactored logic function with the test data
         let result =
-            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, true)
+            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, false)
                 .unwrap();
 
         // Assert that the result matches the expected output
@@ -47,7 +47,7 @@ mod tests {
 
         // Call the refactored logic function with the test data
         let result =
-            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, false);
+            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, true);
 
         result
     }
@@ -210,7 +210,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
     // To run this test, ensure you have installed the GitHub CLI and are authenticated
     // cause it will fetch the latest release branches from the GitHub API
     async fn works_for_all_versions() {
-        let release_versions = crate::versions::get_release_branches_versions(Repository::PSDK)
+        let release_versions = crate::versions::get_release_branches_versions(Repository::Psdk)
             .await
             .unwrap();
 

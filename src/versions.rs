@@ -222,7 +222,6 @@ struct Branch {
     name: String,
 }
 
-#[derive(Default)]
 struct RepositoryInfo {
     branches_url: String,
     gh_cmd_url: String,

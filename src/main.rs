@@ -23,8 +23,11 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use toml_edit::DocumentMut;
+use versions::get_orml_crates_and_version;
 use versions::get_release_branches_versions;
 use versions::get_version_mapping_with_fallback;
+use versions::include_orml_crates_in_version_mapping;
+use versions::Repository;
 
 pub const DEFAULT_GIT_SERVER: &str = "https://raw.githubusercontent.com";
 
@@ -53,6 +56,10 @@ struct Command {
     /// Check if the dependencies versions match the Polkadot SDK version. Does not update the Cargo.toml
     #[clap(short, long)]
     check: bool,
+
+    /// To either list available ORML versions or update the Cargo.toml file with corresponding ORML versions.
+    #[clap(short('O'), long)]
+    orml: bool,
 }
 
 #[tokio::main]
@@ -61,7 +68,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cmd = Command::parse();
 
     if cmd.list {
-        let crates_versions = get_release_branches_versions().await?;
+        let crates_versions = if cmd.orml {
+            get_release_branches_versions(Repository::Orml).await?
+        } else {
+            get_release_branches_versions(Repository::Psdk).await?
+        };
+
         println!("Available versions:");
         for version in crates_versions.iter() {
             println!("- {}", version);
@@ -74,15 +86,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cargo_toml_path = validate_workspace_path(cmd.path)?;
 
     // Decide which branch data to use based on the branch name
-    let crates_versions: BTreeMap<String, String> =
+    let mut crates_versions: BTreeMap<String, String> =
         get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &version).await?;
 
-    update_dependencies(
-        &cargo_toml_path,
-        &crates_versions,
-        cmd.overwrite,
-        cmd.check,
-    )?;
+    let orml_crates_version = if cmd.orml {
+        get_orml_crates_and_version(DEFAULT_GIT_SERVER, &version).await?
+    } else {
+        None
+    };
+
+    include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates_version);
+
+    update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite, cmd.check)?;
 
     Ok(())
 }
@@ -109,7 +124,8 @@ fn update_dependencies(
     overwrite: bool,
     only_check: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let cargo_toml = update_dependencies_impl(cargo_toml_path, crates_versions, overwrite, only_check)?;
+    let cargo_toml =
+        update_dependencies_impl(cargo_toml_path, crates_versions, overwrite, only_check)?;
 
     match cargo_toml {
         Some(new_content) => {
@@ -187,11 +203,11 @@ pub fn update_table_dependencies(
                 continue;
             }
 
-            table.remove("git");
             table.remove("rev");
             table.remove("branch");
             table.remove("tag");
             table.remove("path");
+            table.remove("git");
 
             let mut new_table = toml_edit::InlineTable::default();
 
@@ -221,3 +237,5 @@ pub fn update_table_dependencies(
         log::debug!("Setting {} to {}", dep_key_str, crate_version);
     }
 }
+
+// orml-tokens = { git = "https://github.com/open-web3-stack/open-runtime-module-library", branch = "release-polkadot-v1.1.0", default-features = false }

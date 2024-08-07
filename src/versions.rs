@@ -42,15 +42,6 @@ pub struct Crate {
     pub publish: Option<bool>,
 }
 
-// pub async fn update_orml_crates_version(
-//     version: &str,
-//     dep_table: &mut toml_edit::Table,
-//     crates_versions: &BTreeMap<String, String>,
-//     overwrite: bool
-// ) -> Result<(), Box<dyn std::error::Error>> {
-
-// }
-
 pub async fn get_orml_crates_and_version(
     base_url: &str,
     version: &str,

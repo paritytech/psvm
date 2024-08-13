@@ -18,16 +18,19 @@ mod versions;
 
 use clap::Parser;
 use env_logger::Env;
-use std::collections::BTreeMap;
-use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{ Path, PathBuf, },
+};
 use toml_edit::DocumentMut;
-use versions::get_orml_crates_and_version;
-use versions::get_release_branches_versions;
-use versions::get_version_mapping_with_fallback;
-use versions::include_orml_crates_in_version_mapping;
-use versions::Repository;
+use versions::{
+    get_orml_crates_and_version,
+    get_release_branches_versions,
+    get_version_mapping_with_fallback,
+    include_orml_crates_in_version_mapping,
+    Repository,
+};
 
 pub const DEFAULT_GIT_SERVER: &str = "https://raw.githubusercontent.com";
 

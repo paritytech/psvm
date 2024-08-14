@@ -92,13 +92,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut crates_versions: BTreeMap<String, String> =
         get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &version).await?;
 
-    let orml_crates_version = if cmd.orml {
-        get_orml_crates_and_version(DEFAULT_GIT_SERVER, &version).await?
-    } else {
-        None
-    };
-
-    include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates_version);
+    if cmd.orml {
+        let orml_crates = get_orml_crates_and_version(DEFAULT_GIT_SERVER, &version).await?;
+        include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates);
+    }
 
     update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite, cmd.check)?;
 
@@ -240,5 +237,3 @@ pub fn update_table_dependencies(
         log::debug!("Setting {} to {}", dep_key_str, crate_version);
     }
 }
-
-// orml-tokens = { git = "https://github.com/open-web3-stack/open-runtime-module-library", branch = "release-polkadot-v1.1.0", default-features = false }

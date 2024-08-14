@@ -47,7 +47,7 @@ mod tests {
             .await
             .unwrap();
 
-        let orml_crates_version = get_orml_crates_and_version(crate::DEFAULT_GIT_SERVER, &version).await.unwrap();
+        let orml_crates_version = get_orml_crates_and_version(crate::DEFAULT_GIT_SERVER, &version).await?;
         include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates_version);
 
         // Call the refactored logic function with the test data

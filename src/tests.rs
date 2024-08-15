@@ -15,7 +15,10 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::versions::get_orml_crates_and_version;
     use crate::versions::get_version_mapping_with_fallback;
+    use crate::versions::include_orml_crates_in_version_mapping;
+    use crate::versions::Repository;
     use std::{error::Error, path::Path};
 
     async fn verify_version_mapping(
@@ -40,15 +43,39 @@ mod tests {
         version: &str,
         input_cargo_toml_path: &Path,
     ) -> Result<Option<String>, Box<dyn Error>> {
-        let crates_versions = get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, version)
+        let mut crates_versions = get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, version)
             .await
             .unwrap();
+
+        let orml_crates_version = get_orml_crates_and_version(crate::DEFAULT_GIT_SERVER, &version).await?;
+        include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates_version);
 
         // Call the refactored logic function with the test data
         let result =
             crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, true);
 
         result
+    }
+
+    async fn verify_orml_version_mapping(
+        version: &str,
+        input_cargo_toml_path: &Path,
+        expected_cargo_toml: &str,
+    ) {
+        let mut crates_versions = get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, version)
+            .await
+            .unwrap();
+        
+        let orml_crates_version = get_orml_crates_and_version(crate::DEFAULT_GIT_SERVER, &version).await.unwrap();
+        include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates_version);
+        
+        // Call the refactored logic function with the test data
+        let result =
+            crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, false)
+                .unwrap();
+        
+        // Assert that the result matches the expected output
+        assert_eq!(result, Some(expected_cargo_toml.into()));
     }
 
     #[tokio::test]
@@ -64,11 +91,25 @@ mod tests {
 
     #[tokio::test]
     // cargo psvm -v 1.14.0 -c
-    // This version doesn't have the Plan.toml file, so it will fallback to Cargo.lock
-    // and check if the versions in the local toml file comply with the Cargo.lock file
+    // This version has the Plan.toml file, so it will not fallback to Cargo.lock
+    // and check if the versions in the local toml file comply with the Plan.toml file
     async fn test_check_version_without_fallback_passes() {
         let input_cargo_toml_path = Path::new("src/testing/plan-toml/check.Cargo.toml");
         let version = "1.14.0";
+
+        let res = verify_version_checking(version, input_cargo_toml_path).await;
+        assert!(res.is_ok());
+        assert!(res.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    // cargo psvm -v 1.6.0 -c -O
+    // This version has the Plan.toml file, so it will not fallback to Cargo.lock
+    // and check if the versions in the local toml file comply with the Plan.toml file,
+    // including the ORML crates.
+    async fn test_check_version_with_orml_passes() {
+        let input_cargo_toml_path = Path::new("src/testing/orml/output.Cargo.toml");
+        let version = "1.6.0";
 
         let res = verify_version_checking(version, input_cargo_toml_path).await;
         assert!(res.is_ok());
@@ -115,6 +156,42 @@ mod tests {
         let version = "1.5.0";
 
         verify_version_mapping(version, input_toml_path, expected_output_toml).await;
+    }
+
+    #[tokio::test]
+    // cargo psvm -v 1.6.0 -O
+    // This version is present in the ORML repository, so it will fetch the ORML crates and update
+    // the Cargo.toml file with the new versions
+    async fn test_orml_version_mapping_passes() {
+        let input_cargo_toml_path = Path::new("src/testing/orml/input.Cargo.toml");
+        let output_cargo_toml_path = include_str!("testing/orml/output.Cargo.toml");
+        let version = "1.6.0";
+
+        verify_orml_version_mapping(version, input_cargo_toml_path, output_cargo_toml_path).await;
+    }
+
+    #[tokio::test]
+    // cargo psvm -v 1.14.0 -O
+    // This version is not present in the ORML repository, so it will not fetch the ORML crates and update
+    // the Cargo.toml file with only the polkadot-sdk versions
+    async fn test_orml_mapping_without_branch_passes() {
+        let input_cargo_toml_path = Path::new("src/testing/orml/input.Cargo.toml");
+        let output_cargo_toml_path = include_str!("testing/orml/notOrml.Cargo.toml");
+        let version = "1.14.0";
+
+        verify_orml_version_mapping(version, input_cargo_toml_path, output_cargo_toml_path).await;
+    }
+
+    #[tokio::test]
+    // cargo psvm -v 1.6.0
+    // This version is present in the ORML repository, but the --orml flag isn't supplied so it will not touch
+    // the ORML crates and update the Cargo.toml file with only the polkadot-sdk versions
+    async fn test_orml_mapping_without_flag_passes() {
+        let input_cargo_toml_path = Path::new("src/testing/orml/input.Cargo.toml");
+        let output_cargo_toml_path = include_str!("testing/orml/noFlag.Cargo.toml");
+        let version = "1.6.0";
+
+        verify_version_mapping(version, input_cargo_toml_path, output_cargo_toml_path).await;
     }
 
     #[tokio::test]
@@ -209,7 +286,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
     // To run this test, ensure you have installed the GitHub CLI and are authenticated
     // cause it will fetch the latest release branches from the GitHub API
     async fn works_for_all_versions() {
-        let release_versions = crate::versions::get_release_branches_versions()
+        let release_versions = crate::versions::get_release_branches_versions(Repository::Psdk)
             .await
             .unwrap();
 
@@ -226,6 +303,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
             );
 
             let input_cargo_toml_path = Path::new("src/testing/plan-toml/input.Cargo.toml");
+            let result = crate::update_dependencies_impl(
+                &input_cargo_toml_path,
+                &crates_versions,
+                false,
+                false,
+            )
+            .unwrap();
+
+            assert!(result.is_some()); // If no changes are made, the result will be None
+        }
+    }
+
+    #[tokio::test]
+    // This test will fetch all available versions, update a generic parachain Cargo.toml file
+    // and assert that the Cargo.toml file has been updated (modified)
+    // This is not exhaustive, but it's a good way to ensure that the logic works for all orml versions
+    // To run this test, ensure you have installed the GitHub CLI and are authenticated
+    // cause it will fetch the latest release branches from the GitHub API
+    async fn works_for_all_orml_versions() {
+        let release_versions = crate::versions::get_release_branches_versions(Repository::Orml)
+            .await
+            .unwrap();
+
+        for version in release_versions {
+            let mut crates_versions =
+                get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, &version)
+                    .await
+                    .unwrap();
+            
+            let orml_crates_version = get_orml_crates_and_version(crate::DEFAULT_GIT_SERVER, &version).await.unwrap();
+            include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates_version);
+
+            assert!(
+                crates_versions.len() > 0,
+                "No versions found for {}",
+                version
+            );
+
+            let input_cargo_toml_path = Path::new("src/testing/orml/input.Cargo.toml");
             let result = crate::update_dependencies_impl(
                 &input_cargo_toml_path,
                 &crates_versions,

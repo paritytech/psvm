@@ -26,6 +26,8 @@ If you want to update the dependencies to a specific Polkadot SDK version, you c
 
 If you want to check if the dependencies in your local Cargo.toml file are matching to a specific Polkadot SDK version, you can use the `-c` or `--check` flag along with the `--version` flag followed by the version you want to check against.
 
+If you want to update the ORML crates in your local Cargo.toml, you can use the `-O` or `--orml` flag along with the `--version` flag to update the ORML crates along with the polkadot-sdk crates. This works only if the supplied version is present in the ORML releases.
+
 ```sh
 # Go to the directory containing the Cargo.toml file you want to update
 cd <cargo-toml-dir>
@@ -38,7 +40,9 @@ psvm -v "1.7.0" -o
 # List all available Polkadot SDK versions
 psvm -l
 # Check against a particular Polkadot SDK version without updating the Cargo.toml file
-psmv -v "1.4.0" -c
+psvm -v "1.4.0" -c
+# Update the ORML dependencies along with the Polkadot SDK dependencies.
+psvm -v "1.6.0" -O
 ```
 
 > Listing all available Polkadot SDK versions requires querying the GitHub API, so your IP may be rate-limited. If a rate limit is reached, the tool will fallback to the GitHub CLI to list the versions. Ensure you have the GitHub CLI installed and authenticated to avoid any issue.

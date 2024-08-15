@@ -16,30 +16,178 @@
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
 
+/// Represents the structure of a Cargo.lock file, including all packages.
 #[derive(Debug, Deserialize)]
 struct CargoLock {
+    /// A list of packages included in the Cargo.lock file.
     package: Vec<Package>,
 }
 
+/// Represents a single package within a Cargo.lock file.
 #[derive(Debug, Deserialize)]
 struct Package {
+    /// The name of the package.
     name: String,
+    /// The version of the package.
     version: String,
+    /// The source from which the package was retrieved(usually GitHub), if any.
     source: Option<String>,
 }
 
+/// Represents the structure of a Plan.toml file, with all crates.
 #[derive(Debug, Deserialize)]
 pub struct PlanToml {
+    /// A list of crates included in the Plan.toml file.
     #[serde(rename = "crate")]
     pub crates: Vec<Crate>,
 }
 
+/// Represents a single crate within a Plan.toml file.
 #[derive(Debug, Deserialize)]
 pub struct Crate {
+    /// The name of the crate.
     pub name: String,
+    /// The version the crate is updating to.
     pub to: String,
+    /// The current version of the crate.
     pub from: String,
+    /// Indicates if the crate should be published.
     pub publish: Option<bool>,
+}
+
+/// Represents the structure of an Orml.toml file with workspace information.
+#[derive(Debug, Deserialize)]
+pub struct OrmlToml {
+    /// The workspace information.
+    pub workspace: Workspace,
+}
+
+/// Represents the metadata section within a workspace.
+#[derive(Deserialize, Debug)]
+pub struct Metadata {
+    /// ORML specific metadata.
+    orml: Orml,
+}
+
+/// Represents ORML specific metadata.
+#[derive(Deserialize, Debug)]
+pub struct Orml {
+    /// The version of the crates managed by ORML.
+    #[serde(rename = "crates-version")]
+    crates_version: String,
+}
+
+/// Represents a workspace, including its members and metadata.
+#[derive(Deserialize, Debug)]
+pub struct Workspace {
+    /// A list of members (crates) in the workspace.
+    members: Vec<String>,
+    /// Metadata associated with the workspace.
+    metadata: Metadata,
+}
+
+/// Fetches the ORML crates and their versions for a specific version of Polkadot.
+///
+/// This function queries a repository for a specific version of the ORML crates,
+/// attempting to retrieve the `Cargo.dev.toml` file that lists the ORML workspace members
+/// and the corresponding crates version. It uses the provided `base_url` and `version` to 
+/// construct the URL for the request.
+///
+/// # Arguments
+///
+/// * `base_url` - The base URL of GitHub.
+/// * `version` - The release version of the Polkadot-sdk for which ORML crates' versions are being fetched.
+///
+/// # Returns
+///
+/// Returns `Ok(Some(OrmlToml))` if the `Cargo.dev.toml` file is successfully retrieved and parsed,
+/// indicating the ORML crates and their versions. Returns `Ok(None)` if no matching ORML release
+/// version is found for the corresponding Polkadot version. In case of any error during the
+/// fetching or parsing process, an error is returned.
+///
+/// # Errors
+///
+/// This function returns an error if there is any issue with the HTTP request, response parsing,
+/// or if the required fields are not found in the `Cargo.dev.toml` file.
+///
+/// # Examples
+///
+/// ```
+/// #[tokio::main]
+/// async fn main() {
+///     let base_url = "https://raw.githubusercontent.com";
+///     let version = "1.12.0";
+///     match get_orml_crates_and_version(base_url, version).await {
+///         Ok(Some(orml_toml)) => println!("ORML crates: {:?}", orml_toml),
+///         Ok(None) => println!("No matching ORML version found."),
+///         Err(e) => println!("Error fetching ORML crates: {}", e),
+///     }
+/// }
+/// ```
+pub async fn get_orml_crates_and_version(
+    base_url: &str,
+    version: &str,
+) -> Result<Option<OrmlToml>, Box<dyn std::error::Error>> {
+    if get_release_branches_versions(Repository::Orml)
+        .await?
+        .contains(&version.to_string())
+    {
+        let version_url = format!(
+            "{}/open-web3-stack/open-runtime-module-library/polkadot-v{}/Cargo.dev.toml",
+            base_url, version
+        );
+        let response = reqwest::Client::new()
+            .get(&version_url)
+            .header("User-Agent", "reqwest")
+            .header("Accept", "application/vnd.github.v3+json")
+            .send()
+            .await?;
+
+        let content = response.text().await?;
+
+        let orml_workspace_members = toml::from_str::<OrmlToml>(&content)
+            .map_err(|_| return "Error Parsing ORML TOML. Required Fields not Found")?;
+        Ok(Some(orml_workspace_members))
+    } else {
+        log::error!(
+            "No matching ORML release version found for corresponding polkadot-sdk version."
+        );
+        Ok(None)
+    }
+}
+
+/// Includes ORML crates in the version mapping.
+///
+/// This function updates a given version mapping (`BTreeMap`) by adding the versions of ORML 
+/// crates obtained from a `OrmlToml` instance. It prefixes each crate name with "orml-" and 
+/// inserts the corresponding version into the map. If the `orml_crates_version` is `None`, 
+/// the function does nothing.
+///
+/// # Arguments
+///
+/// * `crates_versions` - A mutable reference to a `BTreeMap` where the original polkadot-sdk 
+///   crate names and versions are stored.
+/// * `orml_crates_version` - An `Option<OrmlToml>` that may contain the ORML crates and their
+///   versions.
+///
+/// # Examples
+///
+/// ```
+/// let mut version_map: BTreeMap<String, String> = BTreeMap::new();
+/// include_orml_crates_in_version_mapping(&mut version_map, Some(orml_toml));
+/// ```
+pub fn include_orml_crates_in_version_mapping(
+    crates_versions: &mut BTreeMap<String, String>,
+    orml_crates_version: Option<OrmlToml>,
+) {
+    if let Some(orml_toml) = orml_crates_version {
+        for crate_name in orml_toml.workspace.members {
+            crates_versions.insert(
+                format!("orml-{}",crate_name),
+                orml_toml.workspace.metadata.orml.crates_version.clone(),
+            );
+        }
+    }
 }
 
 pub async fn get_version_mapping_with_fallback(
@@ -56,18 +204,17 @@ pub async fn get_version_mapping_with_fallback(
     }
 }
 
-fn version_to_url(
-    base_url: &str,
-    version: &str,
-    source: &str,
-) -> String {
+fn version_to_url(base_url: &str, version: &str, source: &str) -> String {
     let version = if version.starts_with("stable") {
         version.into()
     } else {
         format!("release-crates-io-v{}", version)
     };
 
-    format!("{}/paritytech/polkadot-sdk/{}/{}", base_url, version, source)
+    format!(
+        "{}/paritytech/polkadot-sdk/{}/{}",
+        base_url, version, source
+    )
 }
 
 pub async fn get_version_mapping(
@@ -82,7 +229,6 @@ pub async fn get_version_mapping(
         .header("Accept", "application/vnd.github.v3+json")
         .send()
         .await?;
-
     let content = response.text().await?;
 
     match source {
@@ -140,22 +286,106 @@ async fn get_plan_packages(
     Ok(plan_packages)
 }
 
+/// Represents a single branch in a repository.
+///
+/// This struct is used to deserialize JSON data from a repository's branch list.
 #[derive(serde::Deserialize, Debug)]
 struct Branch {
+    /// The name of the branch.
     name: String,
 }
 
-pub async fn get_release_branches_versions() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+/// Contains information about a repository.
+///
+/// This struct holds various URLs and strings used to interact with a repository,
+/// including fetching branches and processing version information.
+struct RepositoryInfo {
+    /// The URL to fetch branch information from the repository.
+    branches_url: String,
+    /// The URL for GitHub commands related to the repository.
+    gh_cmd_url: String,
+    /// A string used to filter versions from branch names.
+    version_filter_string: String,
+    /// A string used to replace parts of the version string if necessary.
+    version_replace_string: String,
+}
+
+pub enum Repository {
+    /// The official ORML repository
+    Orml,
+    /// The official Polkadot SDK repository
+    Psdk,
+}
+
+fn get_repository_info(repository: &Repository) -> RepositoryInfo {
+    match repository {
+        Repository::Orml => RepositoryInfo {
+            branches_url: "https://api.github.com/repos/open-web3-stack/open-runtime-module-library/branches?per_page=100&page=".into(),
+            gh_cmd_url: "/repos/open-web3-stack/open-runtime-module-library/branches?per_page=100&page=".into(),
+            version_filter_string: "polkadot-v1".into(),
+            version_replace_string: "polkadot-v".into()
+        },
+        Repository::Psdk => RepositoryInfo {
+            branches_url: "https://api.github.com/repos/paritytech/polkadot-sdk/branches?per_page=100&page=".into(),
+            gh_cmd_url: "/repos/paritytech/polkadot-sdk/branches/per_page=100&page={}".into(),
+            version_filter_string: "release-crates-io-v".into(),
+            version_replace_string: "release-crates-io-v".into()
+        },
+    }
+}
+
+/// Fetches the versions of release branches from a repository.
+///
+/// This asynchronous function queries a repository for its branches and filters out those
+/// that match a specific versioning pattern. It supports fetching data via HTTP requests
+/// and, in case of failure, falls back to querying the GitHub API using the `gh` command-line tool.
+///
+/// # Arguments
+///
+/// * `repository` - A `Repository` enum specifying whether to query the ORML or Polkadot SDK repository.
+///
+/// # Returns
+///
+/// Returns a `Result` containing either a vector of version strings on success or an error on failure.
+///
+/// # Errors
+///
+/// This function can return an error in several cases, including but not limited to:
+/// - Network failures during the HTTP request.
+/// - JSON parsing errors when deserializing the response into `Branch` structs.
+/// - UTF-8 decoding errors when processing the output of the `gh` command.
+/// - I/O errors when executing the `gh` command.
+///
+/// # Examples
+///
+/// ```no_run
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let orml_repository = Repository::Orml;
+///     let orml_versions = get_release_branches_versions(orml_repository).await?;
+///     println!("Orml Release versions: {:?}", orml_versions);
+/// 
+///     let psdk_repository = Repository::Psdk;
+///     let psdk_versions = get_release_branches_versions(psdk_repository).await?;
+///     println!("Polkadot-sdk Release versions: {:?}", psdk_versions);
+/// 
+///     Ok(())
+/// }
+/// ```
+pub async fn get_release_branches_versions(
+    repository: Repository,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut release_branches = vec![];
+    let repository_info = get_repository_info(&repository);
 
     for page in 1..100 {
         // currently there's 5 pages, so 100 should be enough
         let response = reqwest::Client::new()
-        .get(format!("https://api.github.com/repos/paritytech/polkadot-sdk/branches?per_page=100&page={}", page))
-        .header("User-Agent", "reqwest")
-        .header("Accept", "application/vnd.github.v3+json")
-        .send()
-        .await?;
+            .get(format!("{}{}", repository_info.branches_url, page))
+            .header("User-Agent", "reqwest")
+            .header("Accept", "application/vnd.github.v3+json")
+            .send()
+            .await?;
 
         let output = if response.status().is_success() {
             response.text().await?
@@ -169,10 +399,7 @@ pub async fn get_release_branches_versions() -> Result<Vec<String>, Box<dyn std:
                         "Accept: application/vnd.github+json",
                         "-H",
                         "X-GitHub-Api-Version: 2022-11-28",
-                        &format!(
-                            "/repos/paritytech/polkadot-sdk/branches?per_page=100&page={}",
-                            page
-                        ),
+                        &format!("{}{}", repository_info.gh_cmd_url, page),
                     ])
                     .output()?
                     .stdout,
@@ -183,8 +410,13 @@ pub async fn get_release_branches_versions() -> Result<Vec<String>, Box<dyn std:
 
         let version_branches = branches
             .iter()
-            .filter(|b| b.name.starts_with("release-crates-io-v"))
-            .map(|branch| branch.name.replace("release-crates-io-v", ""));
+            .filter(|b| b.name.starts_with(&repository_info.version_filter_string))
+            .filter(|b| (b.name != "polkadot-v1.0.0")) // This is in place to filter that particular orml version as it is not a valid polkadot-sdk release version
+            .map(|branch| {
+                branch
+                    .name
+                    .replace(&repository_info.version_replace_string, "")
+            });
 
         release_branches = release_branches
             .into_iter()
@@ -219,10 +451,7 @@ pub async fn get_parity_crate_owner_crates() -> Result<HashSet<String>, Box<dyn 
 
         let crates_data: serde_json::Value = serde_json::from_str(&output)?;
 
-        let crates = crates_data["crates"]
-            .as_array()
-            .unwrap()
-            .iter();
+        let crates = crates_data["crates"].as_array().unwrap().iter();
 
         let crates_len = crates.len();
 

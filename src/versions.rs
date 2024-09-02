@@ -14,7 +14,9 @@
 // limitations under the License.
 
 use serde::Deserialize;
-use std::collections::{BTreeMap, HashSet};
+use std::{collections::{BTreeMap, HashSet}, time::Instant};
+use regex::Regex;
+use tokio::{ task, try_join };
 
 /// Represents the structure of a Cargo.lock file, including all packages.
 #[derive(Debug, Deserialize)]
@@ -86,6 +88,109 @@ pub struct Workspace {
     metadata: Metadata,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct TagInfo {
+    pub name: String,
+}
+
+const POLKADOT_SDK_TAGS_URL: &str = "https://api.github.com/repos/paritytech/polkadot-sdk/tags?per_page=100&page=";
+const POLKADOT_SDK_TAGS_GH_CMD_URL: &str = "/repos/paritytech/polkadot-sdk/tags?per_page=100&page=";
+const POLKADOT_SDK_TAG_BRANCH_URL: &str = "https://github.com/paritytech/polkadot-sdk/tree/";
+const POLKADOT_SDK_STABLE_TAGS_REGEX: &str = r"^polkadot-stable\d+(-\d+)?$";
+
+// pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+//     // let start = Instant::now();
+//     // let mut crates_io_releases = get_release_branches_versions(Repository::Psdk).await?;
+//     let mut stable_tag_versions = get_stable_tag_versions().await?;
+//     // let duration = start.elapsed(); // Calculate elapsed time
+//     // println!("Execution time: {:?}", duration); // Print execution time
+//     // crates_io_releases.append(&mut stable_tag_versions);
+//     // Ok(crates_io_releases)
+//     Ok(stable_tag_versions)
+// }
+
+pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+    let start = Instant::now();
+
+    let psdk_future = task::spawn(async {
+        get_release_branches_versions(Repository::Psdk).await
+    });
+    let stable_future = task::spawn(async {
+        get_stable_tag_versions().await
+    });
+
+    // Use try_join to wait for both futures to finish
+    let (crates_io_releases, mut stable_tag_versions) = try_join!(
+        psdk_future,
+        stable_future
+    )?;
+
+    // Calculate elapsed time and print execution time
+    let duration = start.elapsed();
+    println!("Execution time: {:?}", duration);
+
+    // Combine the results
+    let mut combined_releases = crates_io_releases?;
+    combined_releases.append(&mut stable_tag_versions?);
+
+    Ok(combined_releases)
+}
+
+pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+    let mut release_tags = vec![];
+    
+    for page in 1..100 {
+        let response = reqwest::Client::new()
+        .get(format!("{}{}", POLKADOT_SDK_TAGS_URL, page))
+        .header("User-Agent", "reqwest")
+        .header("Accept", "application/vnd.github.v3+json")
+        .send()
+        .await?;
+    
+        let output = if response.status().is_success() {
+            println!("Used the API URL IN get_stable_tag_versions");
+            response.text().await?
+        } else {
+            println!("Used the COMMANDLINE URL IN get_stable_tag_versions");
+            // query the github api using gh command
+            String::from_utf8(
+                std::process::Command::new("gh")
+                .args([
+                    "api",
+                    "-H",
+                    "Accept: application/vnd.github+json",
+                    "-H",
+                    "X-GitHub-Api-Version: 2022-11-28",
+                    &format!("{}{}", POLKADOT_SDK_TAGS_GH_CMD_URL, page),
+                    ])
+                    .output()?
+                    .stdout,
+                )?
+            };
+        
+        // println!("Output: {}\n\n", output);
+
+        let tag_branches: Vec<TagInfo> = serde_json::from_str(&output)?;
+        let tag_regex = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
+        
+        let stable_tag_branches = tag_branches
+            .iter()
+            .filter(|b| tag_regex.is_match(&b.name))
+            .map(|branch| branch.name.to_string());
+
+            release_tags = release_tags
+                .into_iter()
+                .chain(stable_tag_branches)
+                .collect();
+
+        if tag_branches.len() < 100 {
+            break;
+        }
+    }
+
+    Ok(release_tags)
+}
+
 /// Fetches the ORML crates and their versions for a specific version of Polkadot.
 ///
 /// This function queries a repository for a specific version of the ORML crates,
@@ -127,7 +232,7 @@ pub struct Workspace {
 pub async fn get_orml_crates_and_version(
     base_url: &str,
     version: &str,
-) -> Result<Option<OrmlToml>, Box<dyn std::error::Error>> {
+) -> Result<Option<OrmlToml>, Box<dyn std::error::Error + Send + Sync>> {
     if get_release_branches_versions(Repository::Orml)
         .await?
         .contains(&version.to_string())
@@ -193,7 +298,7 @@ pub fn include_orml_crates_in_version_mapping(
 pub async fn get_version_mapping_with_fallback(
     base_url: &str,
     version: &str,
-) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error>> {
+) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error + Send + Sync>> {
     let result = get_version_mapping(base_url, version, "Plan.toml").await;
 
     if result.is_err() {
@@ -211,6 +316,7 @@ fn version_to_url(base_url: &str, version: &str, source: &str) -> String {
         format!("release-crates-io-v{}", version)
     };
 
+    // TODO Add version URL for tag releases
     format!(
         "{}/paritytech/polkadot-sdk/{}/{}",
         base_url, version, source
@@ -221,7 +327,7 @@ pub async fn get_version_mapping(
     base_url: &str,
     version: &str,
     source: &str,
-) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error>> {
+) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error + Send + Sync>> {
     let url = version_to_url(base_url, version, source);
     let response = reqwest::Client::new()
         .get(&url)
@@ -240,7 +346,7 @@ pub async fn get_version_mapping(
 
 fn get_cargo_packages(
     content: &str,
-) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error>> {
+) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error + Send + Sync>> {
     let cargo_lock: CargoLock = toml::from_str(content)?;
 
     // Filter local packages and collect them into a JSON object
@@ -256,7 +362,7 @@ fn get_cargo_packages(
 
 async fn get_plan_packages(
     content: &str,
-) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error>> {
+) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error + Send + Sync>> {
     let plan_toml: PlanToml = toml::from_str(content)?;
 
     let parity_owned_crates = get_parity_crate_owner_crates().await?;
@@ -374,7 +480,7 @@ fn get_repository_info(repository: &Repository) -> RepositoryInfo {
 /// ```
 pub async fn get_release_branches_versions(
     repository: Repository,
-) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
     let mut release_branches = vec![];
     let repository_info = get_repository_info(&repository);
 
@@ -388,8 +494,11 @@ pub async fn get_release_branches_versions(
             .await?;
 
         let output = if response.status().is_success() {
+            println!("Used the API URL IN get_release_branches_versions");
             response.text().await?
         } else {
+            println!("Used the COMMANDLINE URL IN get_release_branches_versions");
+
             // query the github api using gh command
             String::from_utf8(
                 std::process::Command::new("gh")
@@ -413,8 +522,7 @@ pub async fn get_release_branches_versions(
             .filter(|b| b.name.starts_with(&repository_info.version_filter_string))
             .filter(|b| (b.name != "polkadot-v1.0.0")) // This is in place to filter that particular orml version as it is not a valid polkadot-sdk release version
             .map(|branch| {
-                branch
-                    .name
+                branch.name
                     .replace(&repository_info.version_replace_string, "")
             });
 
@@ -431,7 +539,7 @@ pub async fn get_release_branches_versions(
     Ok(release_branches)
 }
 
-pub async fn get_parity_crate_owner_crates() -> Result<HashSet<String>, Box<dyn std::error::Error>>
+pub async fn get_parity_crate_owner_crates() -> Result<HashSet<String>, Box<dyn std::error::Error + Send + Sync>>
 {
     let mut parity_crates = HashSet::new();
 

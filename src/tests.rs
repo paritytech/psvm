@@ -42,12 +42,14 @@ mod tests {
     async fn verify_version_checking(
         version: &str,
         input_cargo_toml_path: &Path,
-    ) -> Result<Option<String>, Box<dyn Error>> {
-        let mut crates_versions = get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, version)
-            .await
-            .unwrap();
+    ) -> Result<Option<String>, Box<dyn Error + Send + Sync>> {
+        let mut crates_versions =
+            get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, version)
+                .await
+                .unwrap();
 
-        let orml_crates_version = get_orml_crates_and_version(crate::DEFAULT_GIT_SERVER, &version).await?;
+        let orml_crates_version =
+            get_orml_crates_and_version(crate::DEFAULT_GIT_SERVER, &version).await?;
         include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates_version);
 
         // Call the refactored logic function with the test data
@@ -62,18 +64,21 @@ mod tests {
         input_cargo_toml_path: &Path,
         expected_cargo_toml: &str,
     ) {
-        let mut crates_versions = get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, version)
+        let mut crates_versions =
+            get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, version)
+                .await
+                .unwrap();
+
+        let orml_crates_version = get_orml_crates_and_version(crate::DEFAULT_GIT_SERVER, &version)
             .await
             .unwrap();
-        
-        let orml_crates_version = get_orml_crates_and_version(crate::DEFAULT_GIT_SERVER, &version).await.unwrap();
         include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates_version);
-        
+
         // Call the refactored logic function with the test data
         let result =
             crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, false)
                 .unwrap();
-        
+
         // Assert that the result matches the expected output
         assert_eq!(result, Some(expected_cargo_toml.into()));
     }
@@ -331,8 +336,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
                 get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, &version)
                     .await
                     .unwrap();
-            
-            let orml_crates_version = get_orml_crates_and_version(crate::DEFAULT_GIT_SERVER, &version).await.unwrap();
+
+            let orml_crates_version =
+                get_orml_crates_and_version(crate::DEFAULT_GIT_SERVER, &version)
+                    .await
+                    .unwrap();
             include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates_version);
 
             assert!(

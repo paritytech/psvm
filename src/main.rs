@@ -21,15 +21,12 @@ use env_logger::Env;
 use std::{
     collections::BTreeMap,
     fs,
-    path::{ Path, PathBuf, },
+    path::{Path, PathBuf},
 };
 use toml_edit::DocumentMut;
 use versions::{
-    get_orml_crates_and_version,
-    get_release_branches_versions,
-    get_version_mapping_with_fallback,
-    include_orml_crates_in_version_mapping,
-    Repository,
+    get_orml_crates_and_version, get_polkadot_sdk_versions, get_release_branches_versions,
+    get_version_mapping_with_fallback, include_orml_crates_in_version_mapping, Repository,
 };
 
 pub const DEFAULT_GIT_SERVER: &str = "https://raw.githubusercontent.com";
@@ -47,6 +44,10 @@ struct Command {
     /// Specifies the Polkadot SDK version. Use '--list' flag to display available versions.
     #[clap(short, long, required_unless_present = "list")]
     version: Option<String>,
+
+    /// Specifies the Polkadot SDK release version. Use '--list' flag to display available releases.
+    #[clap(short, long, required_unless_present = "list")]
+    release: Option<String>,
 
     /// Overwrite local dependencies (using path) with same name as the ones in the Polkadot SDK.
     #[clap(short, long)]
@@ -66,7 +67,7 @@ struct Command {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let cmd = Command::parse();
 
@@ -74,7 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let crates_versions = if cmd.orml {
             get_release_branches_versions(Repository::Orml).await?
         } else {
-            get_release_branches_versions(Repository::Psdk).await?
+            get_polkadot_sdk_versions().await?
         };
 
         println!("Available versions:");
@@ -102,7 +103,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn validate_workspace_path(mut path: PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn validate_workspace_path(
+    mut path: PathBuf,
+) -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
     if path.is_dir() {
         path = path.join("Cargo.toml");
     }
@@ -123,7 +126,7 @@ fn update_dependencies(
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
     only_check: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cargo_toml =
         update_dependencies_impl(cargo_toml_path, crates_versions, overwrite, only_check)?;
 
@@ -148,7 +151,7 @@ fn update_dependencies_impl(
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
     only_check: bool,
-) -> Result<Option<String>, Box<dyn std::error::Error>> {
+) -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
     let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
     let mut cargo_toml: DocumentMut = cargo_toml_content.parse()?;
     // Check if cargo workspace is defined

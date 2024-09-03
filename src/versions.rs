@@ -99,14 +99,13 @@ const POLKADOT_SDK_TAG_BRANCH_URL: &str = "https://github.com/paritytech/polkado
 const POLKADOT_SDK_STABLE_TAGS_REGEX: &str = r"^polkadot-stable\d+(-\d+)?$";
 
 // pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
-//     // let start = Instant::now();
-//     // let mut crates_io_releases = get_release_branches_versions(Repository::Psdk).await?;
+//     let start = Instant::now();
+//     let mut crates_io_releases = get_release_branches_versions(Repository::Psdk).await?;
 //     let mut stable_tag_versions = get_stable_tag_versions().await?;
-//     // let duration = start.elapsed(); // Calculate elapsed time
-//     // println!("Execution time: {:?}", duration); // Print execution time
-//     // crates_io_releases.append(&mut stable_tag_versions);
-//     // Ok(crates_io_releases)
-//     Ok(stable_tag_versions)
+//     let duration = start.elapsed(); // Calculate elapsed time
+//     println!("Execution time: {:?}", duration); // Print execution time
+//     crates_io_releases.append(&mut stable_tag_versions);
+//     Ok(crates_io_releases)
 // }
 
 pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
@@ -115,12 +114,13 @@ pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::err
     let psdk_future = task::spawn(async {
         get_release_branches_versions(Repository::Psdk).await
     });
+    
     let stable_future = task::spawn(async {
         get_stable_tag_versions().await
     });
 
     // Use try_join to wait for both futures to finish
-    let (crates_io_releases, mut stable_tag_versions) = try_join!(
+    let (crates_io_releases, stable_tag_versions) = try_join!(
         psdk_future,
         stable_future
     )?;
@@ -148,10 +148,8 @@ pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error
         .await?;
     
         let output = if response.status().is_success() {
-            println!("Used the API URL IN get_stable_tag_versions");
             response.text().await?
         } else {
-            println!("Used the COMMANDLINE URL IN get_stable_tag_versions");
             // query the github api using gh command
             String::from_utf8(
                 std::process::Command::new("gh")
@@ -168,8 +166,6 @@ pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error
                 )?
             };
         
-        // println!("Output: {}\n\n", output);
-
         let tag_branches: Vec<TagInfo> = serde_json::from_str(&output)?;
         let tag_regex = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
         
@@ -433,7 +429,7 @@ fn get_repository_info(repository: &Repository) -> RepositoryInfo {
         },
         Repository::Psdk => RepositoryInfo {
             branches_url: "https://api.github.com/repos/paritytech/polkadot-sdk/branches?per_page=100&page=".into(),
-            gh_cmd_url: "/repos/paritytech/polkadot-sdk/branches/per_page=100&page={}".into(),
+            gh_cmd_url: "/repos/paritytech/polkadot-sdk/branches?per_page=100&page=".into(),
             version_filter_string: "release-crates-io-v".into(),
             version_replace_string: "release-crates-io-v".into()
         },
@@ -494,11 +490,8 @@ pub async fn get_release_branches_versions(
             .await?;
 
         let output = if response.status().is_success() {
-            println!("Used the API URL IN get_release_branches_versions");
             response.text().await?
         } else {
-            println!("Used the COMMANDLINE URL IN get_release_branches_versions");
-
             // query the github api using gh command
             String::from_utf8(
                 std::process::Command::new("gh")

@@ -98,42 +98,11 @@ const POLKADOT_SDK_TAGS_GH_CMD_URL: &str = "/repos/paritytech/polkadot-sdk/tags?
 const POLKADOT_SDK_TAG_BRANCH_URL: &str = "https://github.com/paritytech/polkadot-sdk/tree/";
 const POLKADOT_SDK_STABLE_TAGS_REGEX: &str = r"^polkadot-stable\d+(-\d+)?$";
 
-// pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
-//     let start = Instant::now();
-//     let mut crates_io_releases = get_release_branches_versions(Repository::Psdk).await?;
-//     let mut stable_tag_versions = get_stable_tag_versions().await?;
-//     let duration = start.elapsed(); // Calculate elapsed time
-//     println!("Execution time: {:?}", duration); // Print execution time
-//     crates_io_releases.append(&mut stable_tag_versions);
-//     Ok(crates_io_releases)
-// }
-
 pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
-    let start = Instant::now();
-
-    let psdk_future = task::spawn(async {
-        get_release_branches_versions(Repository::Psdk).await
-    });
-    
-    let stable_future = task::spawn(async {
-        get_stable_tag_versions().await
-    });
-
-    // Use try_join to wait for both futures to finish
-    let (crates_io_releases, stable_tag_versions) = try_join!(
-        psdk_future,
-        stable_future
-    )?;
-
-    // Calculate elapsed time and print execution time
-    let duration = start.elapsed();
-    println!("Execution time: {:?}", duration);
-
-    // Combine the results
-    let mut combined_releases = crates_io_releases?;
-    combined_releases.append(&mut stable_tag_versions?);
-
-    Ok(combined_releases)
+    let mut crates_io_releases = get_release_branches_versions(Repository::Psdk).await?;
+    let mut stable_tag_versions = get_stable_tag_versions().await?;
+    crates_io_releases.append(&mut stable_tag_versions);
+    Ok(crates_io_releases)
 }
 
 pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {

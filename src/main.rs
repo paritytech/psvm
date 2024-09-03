@@ -45,10 +45,6 @@ struct Command {
     #[clap(short, long, required_unless_present = "list")]
     version: Option<String>,
 
-    /// Specifies the Polkadot SDK release version. Use '--list' flag to display available releases.
-    #[clap(short, long, required_unless_present = "list")]
-    release: Option<String>,
-
     /// Overwrite local dependencies (using path) with same name as the ones in the Polkadot SDK.
     #[clap(short, long)]
     overwrite: bool,
@@ -67,7 +63,7 @@ struct Command {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let cmd = Command::parse();
 
@@ -105,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 fn validate_workspace_path(
     mut path: PathBuf,
-) -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if path.is_dir() {
         path = path.join("Cargo.toml");
     }
@@ -126,7 +122,7 @@ fn update_dependencies(
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
     only_check: bool,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<(), Box<dyn std::error::Error>> {
     let cargo_toml =
         update_dependencies_impl(cargo_toml_path, crates_versions, overwrite, only_check)?;
 
@@ -151,7 +147,7 @@ fn update_dependencies_impl(
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
     only_check: bool,
-) -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
     let mut cargo_toml: DocumentMut = cargo_toml_content.parse()?;
     // Check if cargo workspace is defined

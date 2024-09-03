@@ -42,7 +42,7 @@ mod tests {
     async fn verify_version_checking(
         version: &str,
         input_cargo_toml_path: &Path,
-    ) -> Result<Option<String>, Box<dyn Error + Send + Sync>> {
+    ) -> Result<Option<String>, Box<dyn Error>> {
         let mut crates_versions =
             get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, version)
                 .await
@@ -291,7 +291,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
     // To run this test, ensure you have installed the GitHub CLI and are authenticated
     // cause it will fetch the latest release branches from the GitHub API
     async fn works_for_all_versions() {
-        let release_versions = crate::versions::get_release_branches_versions(Repository::Psdk)
+        let release_versions = crate::versions::get_polkadot_sdk_versions()
             .await
             .unwrap();
 

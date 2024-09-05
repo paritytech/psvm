@@ -15,10 +15,14 @@
 
 #[cfg(test)]
 mod tests {
+    // use crate::cache::get_polkadot_sdk_versions_from_cache;
+    use crate::cache::Cache;
     use crate::versions::get_orml_crates_and_version;
+    use crate::versions::get_polkadot_sdk_versions;
     use crate::versions::get_version_mapping_with_fallback;
     use crate::versions::include_orml_crates_in_version_mapping;
     use crate::versions::Repository;
+    use std::path::PathBuf;
     use std::{error::Error, path::Path};
 
     async fn verify_version_mapping(
@@ -81,6 +85,70 @@ mod tests {
 
         // Assert that the result matches the expected output
         assert_eq!(result, Some(expected_cargo_toml.into()));
+    }
+
+    #[tokio::test]
+    // This version has the Plan.toml file, so it will not fallback to Cargo.lock
+    // and check if the versions in the local toml file comply with the Plan.toml file
+    async fn test_saving_cache_works() {
+        let cache_file_path: PathBuf = PathBuf::from("src/testing/cache.json");
+        let cache_data = get_polkadot_sdk_versions().await.unwrap();
+        let cache = Cache { data: cache_data };
+        let res = cache.save(&cache_file_path);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), ());
+
+        // Delete cache file after test
+        std::fs::remove_file(&cache_file_path).unwrap();
+    }
+
+    #[tokio::test]
+    // This version has the Plan.toml file, so it will not fallback to Cargo.lock
+    // and check if the versions in the local toml file comply with the Plan.toml file
+    async fn test_overwriting_cache_works() {
+        let cache_file_path: PathBuf = PathBuf::from("src/testing/cache.json");
+        let cache_data = get_polkadot_sdk_versions().await.unwrap();
+        let cache = Cache { data: cache_data.clone() };
+        let res = cache.save(&cache_file_path);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), ());
+
+        let cache = Cache { data: cache_data };
+        let res = cache.save(&cache_file_path);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), ());
+
+        // Delete cache file after test
+        std::fs::remove_file(&cache_file_path).unwrap();
+    }
+
+    #[tokio::test]
+    // This version has the Plan.toml file, so it will not fallback to Cargo.lock
+    // and check if the versions in the local toml file comply with the Plan.toml file
+    async fn test_loading_cache_works() {
+        let cache_file_path: PathBuf = PathBuf::from("src/testing/cache.json");
+        let cache_data = get_polkadot_sdk_versions().await.unwrap();
+        let cache = Cache { data: cache_data };
+        let res = cache.save(&cache_file_path);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), ());
+
+        let loaded_cache_data = Cache::load(&cache_file_path).unwrap();
+        assert_eq!(loaded_cache_data.data, cache.data);
+
+        // Delete cache file after test
+        std::fs::remove_file(&cache_file_path).unwrap();
+    }
+
+    #[tokio::test]
+    // This version has the Plan.toml file, so it will not fallback to Cargo.lock
+    // and check if the versions in the local toml file comply with the Plan.toml file
+    async fn test_loading_cache_from_nonexistent_file_fails() {
+        let cache_file_path: PathBuf = PathBuf::from("non/existing/path/cache.json");
+
+        let loaded_cache_data = Cache::load(&cache_file_path);
+        assert!(loaded_cache_data.is_err());
+        assert!(loaded_cache_data.unwrap_err().to_string().contains("No such file or directory"));
     }
 
     #[tokio::test]

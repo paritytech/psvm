@@ -1,6 +1,6 @@
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use serde::{Serialize, Deserialize};
 use crate::versions::get_polkadot_sdk_versions;
 
@@ -23,10 +23,26 @@ impl Cache {
 
     // Save cache to a file
     pub fn save(&self, path: &PathBuf) -> io::Result<()> {
+        // Create the cache path if it doesn't exist. (Should technically only happen once when running for the first time.)
+        if !Path::new(path).exists() {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+
         let contents = serde_json::to_string(&self)?;
         let mut file = File::create(path)?;
         file.write_all(contents.as_bytes())?;
         Ok(())
+    }
+}
+
+fn get_cache_directory() -> Option<PathBuf> {
+    if let Some(cache_dir) = dirs::cache_dir() {
+        let app_cache_dir = cache_dir.join("psvm/cache.json");
+        Some(app_cache_dir)
+    } else {
+        None
     }
 }
 
@@ -62,8 +78,7 @@ impl Cache {
 /// ```
 pub async fn get_polkadot_sdk_versions_from_cache() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     // Path to the cache file. should save as a constant once path is finalized
-    let cache_path = PathBuf::from("./cache.json");
-
+    let cache_path = get_cache_directory().unwrap(); // Can unwrap because we know the cache directory exists
     // Attempt to load the cache
     let cache = Cache::load(&cache_path);
 

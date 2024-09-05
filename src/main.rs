@@ -33,6 +33,7 @@ use versions::{
 use cache::get_polkadot_sdk_versions_from_cache;
 
 pub const DEFAULT_GIT_SERVER: &str = "https://raw.githubusercontent.com";
+pub const DEFAULT_CACHE_PATH: &str = "./target/cache.json";
 
 /// Polkadot SDK Version Manager.
 ///
@@ -92,15 +93,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cmd.list {
         if cmd.orml {
             print_version_list(get_release_branches_versions(Repository::Orml).await?);
-        } else {
-            if cmd.cache {
+        } else if cmd.cache {
                 log::info!("Reading versions from cache");
                 print_version_list(get_polkadot_sdk_versions_from_cache().await?);
-            } else {
+        } else {
                 log::info!("Fetching versions from GitHub");
                 print_version_list(get_polkadot_sdk_versions().await?);
             }
-        }
         return Ok(());
     }
 

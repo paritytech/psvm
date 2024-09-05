@@ -309,7 +309,6 @@ fn version_to_url(base_url: &str, version: &str, source: &str) -> String {
         format!("release-crates-io-v{}", version)
     };
 
-    println!("{}", format!("{}/paritytech/polkadot-sdk/{}/{}", base_url, version, source));
     format!(
         "{}/paritytech/polkadot-sdk/{}/{}",
         base_url, version, source

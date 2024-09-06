@@ -106,7 +106,9 @@ mod tests {
     async fn test_overwriting_cache_works() {
         let cache_file_path: PathBuf = PathBuf::from("src/testing/cache.json");
         let cache_data = get_polkadot_sdk_versions().await.unwrap();
-        let cache = Cache { data: cache_data.clone() };
+        let cache = Cache {
+            data: cache_data.clone(),
+        };
         let res = cache.save(&cache_file_path);
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), ());
@@ -144,7 +146,10 @@ mod tests {
 
         let loaded_cache_data = Cache::load(&cache_file_path);
         assert!(loaded_cache_data.is_err());
-        assert!(loaded_cache_data.unwrap_err().to_string().contains("No such file or directory"));
+        assert!(loaded_cache_data
+            .unwrap_err()
+            .to_string()
+            .contains("No such file or directory"));
     }
 
     #[tokio::test]

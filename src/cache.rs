@@ -1,8 +1,8 @@
+use crate::versions::get_polkadot_sdk_versions;
+use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use serde::{Serialize, Deserialize};
-use crate::versions::get_polkadot_sdk_versions;
 
 /// The structure to hold the cached list of versions
 #[derive(Serialize, Deserialize, Debug)]
@@ -76,10 +76,11 @@ fn get_cache_directory() -> Option<PathBuf> {
 ///     }
 /// }
 /// ```
-pub async fn get_polkadot_sdk_versions_from_cache() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+pub async fn get_polkadot_sdk_versions_from_cache(
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     // Path to the cache file. should save as a constant once path is finalized
     let cache_path = get_cache_directory().unwrap(); // Can unwrap because we know the cache directory exists
-    // Attempt to load the cache
+                                                     // Attempt to load the cache
     let cache = Cache::load(&cache_path);
 
     let data = if let Ok(cache) = cache {

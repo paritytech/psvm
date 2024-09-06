@@ -13,9 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod cache;
 mod tests;
 mod versions;
-mod cache;
 
 use clap::Parser;
 use env_logger::Env;
@@ -46,7 +46,12 @@ struct Command {
     path: PathBuf,
 
     /// Specifies the Polkadot SDK version. Use '--list' flag to display available versions.
-    #[clap(short, long, required_unless_present = "list", required_unless_present = "update_cache")]
+    #[clap(
+        short,
+        long,
+        required_unless_present = "list",
+        required_unless_present = "update_cache"
+    )]
     version: Option<String>,
 
     /// Overwrite local dependencies (using path) with same name as the ones in the Polkadot SDK.
@@ -83,9 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         log::info!("Updating cache by freshly fetching versions from GitHub");
         let versions = get_polkadot_sdk_versions().await?;
         let cache_path = PathBuf::from("./cache.json");
-        let cache = cache::Cache {
-            data: versions,
-        };
+        let cache = cache::Cache { data: versions };
         cache.save(&cache_path)?;
         return Ok(());
     }
@@ -94,12 +97,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if cmd.orml {
             print_version_list(get_release_branches_versions(Repository::Orml).await?);
         } else if cmd.cache {
-                log::info!("Reading versions from cache");
-                print_version_list(get_polkadot_sdk_versions_from_cache().await?);
+            log::info!("Reading versions from cache");
+            print_version_list(get_polkadot_sdk_versions_from_cache().await?);
         } else {
-                log::info!("Fetching versions from GitHub");
-                print_version_list(get_polkadot_sdk_versions().await?);
-            }
+            log::info!("Fetching versions from GitHub");
+            print_version_list(get_polkadot_sdk_versions().await?);
+        }
         return Ok(());
     }
 

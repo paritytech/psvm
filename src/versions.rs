@@ -293,17 +293,17 @@ pub async fn get_version_mapping_with_fallback(
 ) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error>> {
     let result = get_version_mapping(base_url, version, "Plan.toml").await;
 
-    if result.is_err() {
-        println!("Failed to get Plan.toml, falling back to Cargo.lock.");
-        get_version_mapping(base_url, version, "Cargo.lock").await
-    } else {
-        result
+    match result {
+        Err(_) => get_version_mapping(base_url, version, "Cargo.lock").await,
+        Ok(_) => result
     }
 }
 
 fn version_to_url(base_url: &str, version: &str, source: &str) -> String {
     let stable_tag_regex_patten = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
-    let version = if version.starts_with("stable") || stable_tag_regex_patten.is_match(version) {
+    let version = if version.starts_with("stable") {
+        format!("polkadot-{}", version)
+    } else if stable_tag_regex_patten.is_match(version) {
         version.into()
     } else {
         format!("release-crates-io-v{}", version)
@@ -327,7 +327,11 @@ pub async fn get_version_mapping(
         .header("Accept", "application/vnd.github.v3+json")
         .send()
         .await?;
-    let content = response.text().await?;
+
+    let content = match response.error_for_status() {
+        Ok(response) => response.text().await?,
+        Err(err) => return Err(err.into()),
+    };
 
     match source {
         "Cargo.lock" => get_cargo_packages(&content),

@@ -128,9 +128,7 @@ fn print_version_list(crates_versions: Vec<String>) {
     }
 }
 
-fn validate_workspace_path(
-    mut path: PathBuf,
-) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn validate_workspace_path(mut path: PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if path.is_dir() {
         path = path.join("Cargo.toml");
     }

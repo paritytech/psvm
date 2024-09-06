@@ -13,9 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use regex::Regex;
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
-use regex::Regex;
 
 /// Represents the structure of a Cargo.lock file, including all packages.
 #[derive(Debug, Deserialize)]
@@ -94,14 +94,15 @@ pub struct TagInfo {
     pub name: String,
 }
 
-const POLKADOT_SDK_TAGS_URL: &str = "https://api.github.com/repos/paritytech/polkadot-sdk/tags?per_page=100&page=";
+const POLKADOT_SDK_TAGS_URL: &str =
+    "https://api.github.com/repos/paritytech/polkadot-sdk/tags?per_page=100&page=";
 const POLKADOT_SDK_TAGS_GH_CMD_URL: &str = "/repos/paritytech/polkadot-sdk/tags?per_page=100&page=";
 const POLKADOT_SDK_STABLE_TAGS_REGEX: &str = r"^polkadot-stable\d+(-\d+)?$";
 
 /// Fetches a combined list of Polkadot SDK release versions and stable tag releases.
 ///
-/// This function first retrieves release branch versions from the Polkadot SDK and 
-/// then fetches stable tag releases versions. It combines these two lists into a 
+/// This function first retrieves release branch versions from the Polkadot SDK and
+/// then fetches stable tag releases versions. It combines these two lists into a
 /// single list of version strings.
 ///
 /// # Returns
@@ -134,46 +135,46 @@ pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::err
 /// parsing the JSON response into `Vec<TagInfo>` fails.
 pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut release_tags = vec![];
-    
+
     for page in 1..100 {
         let response = reqwest::Client::new()
-        .get(format!("{}{}", POLKADOT_SDK_TAGS_URL, page))
-        .header("User-Agent", "reqwest")
-        .header("Accept", "application/vnd.github.v3+json")
-        .send()
-        .await?;
-    
+            .get(format!("{}{}", POLKADOT_SDK_TAGS_URL, page))
+            .header("User-Agent", "reqwest")
+            .header("Accept", "application/vnd.github.v3+json")
+            .send()
+            .await?;
+
         let output = if response.status().is_success() {
             response.text().await?
         } else {
             // query the github api using gh command
             String::from_utf8(
                 std::process::Command::new("gh")
-                .args([
-                    "api",
-                    "-H",
-                    "Accept: application/vnd.github+json",
-                    "-H",
-                    "X-GitHub-Api-Version: 2022-11-28",
-                    &format!("{}{}", POLKADOT_SDK_TAGS_GH_CMD_URL, page),
+                    .args([
+                        "api",
+                        "-H",
+                        "Accept: application/vnd.github+json",
+                        "-H",
+                        "X-GitHub-Api-Version: 2022-11-28",
+                        &format!("{}{}", POLKADOT_SDK_TAGS_GH_CMD_URL, page),
                     ])
                     .output()?
                     .stdout,
-                )?
-            };
-        
+            )?
+        };
+
         let tag_branches: Vec<TagInfo> = serde_json::from_str(&output)?;
         let tag_regex = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
-        
+
         let stable_tag_branches = tag_branches
             .iter()
             .filter(|b| tag_regex.is_match(&b.name))
             .map(|branch| branch.name.to_string());
 
-            release_tags = release_tags
-                .into_iter()
-                .chain(stable_tag_branches)
-                .collect();
+        release_tags = release_tags
+            .into_iter()
+            .chain(stable_tag_branches)
+            .collect();
 
         if tag_branches.len() < 100 {
             break;
@@ -187,7 +188,7 @@ pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error
 ///
 /// This function queries a repository for a specific version of the ORML crates,
 /// attempting to retrieve the `Cargo.dev.toml` file that lists the ORML workspace members
-/// and the corresponding crates version. It uses the provided `base_url` and `version` to 
+/// and the corresponding crates version. It uses the provided `base_url` and `version` to
 /// construct the URL for the request.
 ///
 /// # Arguments
@@ -255,14 +256,14 @@ pub async fn get_orml_crates_and_version(
 
 /// Includes ORML crates in the version mapping.
 ///
-/// This function updates a given version mapping (`BTreeMap`) by adding the versions of ORML 
-/// crates obtained from a `OrmlToml` instance. It prefixes each crate name with "orml-" and 
-/// inserts the corresponding version into the map. If the `orml_crates_version` is `None`, 
+/// This function updates a given version mapping (`BTreeMap`) by adding the versions of ORML
+/// crates obtained from a `OrmlToml` instance. It prefixes each crate name with "orml-" and
+/// inserts the corresponding version into the map. If the `orml_crates_version` is `None`,
 /// the function does nothing.
 ///
 /// # Arguments
 ///
-/// * `crates_versions` - A mutable reference to a `BTreeMap` where the original polkadot-sdk 
+/// * `crates_versions` - A mutable reference to a `BTreeMap` where the original polkadot-sdk
 ///   crate names and versions are stored.
 /// * `orml_crates_version` - An `Option<OrmlToml>` that may contain the ORML crates and their
 ///   versions.
@@ -280,7 +281,7 @@ pub fn include_orml_crates_in_version_mapping(
     if let Some(orml_toml) = orml_crates_version {
         for crate_name in orml_toml.workspace.members {
             crates_versions.insert(
-                format!("orml-{}",crate_name),
+                format!("orml-{}", crate_name),
                 orml_toml.workspace.metadata.orml.crates_version.clone(),
             );
         }
@@ -293,17 +294,17 @@ pub async fn get_version_mapping_with_fallback(
 ) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error>> {
     let result = get_version_mapping(base_url, version, "Plan.toml").await;
 
-    if result.is_err() {
-        println!("Failed to get Plan.toml, falling back to Cargo.lock.");
-        get_version_mapping(base_url, version, "Cargo.lock").await
-    } else {
-        result
+    match result {
+        Err(_) => get_version_mapping(base_url, version, "Cargo.lock").await,
+        Ok(_) => result,
     }
 }
 
 fn version_to_url(base_url: &str, version: &str, source: &str) -> String {
     let stable_tag_regex_patten = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
-    let version = if version.starts_with("stable") || stable_tag_regex_patten.is_match(version) {
+    let version = if version.starts_with("stable") {
+        format!("polkadot-{}", version)
+    } else if stable_tag_regex_patten.is_match(version) {
         version.into()
     } else {
         format!("release-crates-io-v{}", version)
@@ -327,7 +328,11 @@ pub async fn get_version_mapping(
         .header("Accept", "application/vnd.github.v3+json")
         .send()
         .await?;
-    let content = response.text().await?;
+
+    let content = match response.error_for_status() {
+        Ok(response) => response.text().await?,
+        Err(err) => return Err(err.into()),
+    };
 
     match source {
         "Cargo.lock" => get_cargo_packages(&content),
@@ -462,11 +467,11 @@ fn get_repository_info(repository: &Repository) -> RepositoryInfo {
 ///     let orml_repository = Repository::Orml;
 ///     let orml_versions = get_release_branches_versions(orml_repository).await?;
 ///     println!("Orml Release versions: {:?}", orml_versions);
-/// 
+///
 ///     let psdk_repository = Repository::Psdk;
 ///     let psdk_versions = get_release_branches_versions(psdk_repository).await?;
 ///     println!("Polkadot-sdk Release versions: {:?}", psdk_versions);
-/// 
+///
 ///     Ok(())
 /// }
 /// ```
@@ -511,7 +516,8 @@ pub async fn get_release_branches_versions(
             .filter(|b| b.name.starts_with(&repository_info.version_filter_string))
             .filter(|b| (b.name != "polkadot-v1.0.0")) // This is in place to filter that particular orml version as it is not a valid polkadot-sdk release version
             .map(|branch| {
-                branch.name
+                branch
+                    .name
                     .replace(&repository_info.version_replace_string, "")
             });
 

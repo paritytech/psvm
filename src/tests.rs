@@ -355,9 +355,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
     // To run this test, ensure you have installed the GitHub CLI and are authenticated
     // cause it will fetch the latest release branches from the GitHub API
     async fn works_for_all_versions() {
-        let release_versions = crate::versions::get_polkadot_sdk_versions()
-            .await
-            .unwrap();
+        let release_versions = crate::versions::get_polkadot_sdk_versions().await.unwrap();
 
         for version in release_versions {
             let crates_versions =

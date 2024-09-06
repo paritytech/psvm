@@ -30,10 +30,9 @@ use versions::{
     get_version_mapping_with_fallback, include_orml_crates_in_version_mapping, Repository,
 };
 
-use cache::get_polkadot_sdk_versions_from_cache;
+use cache::{get_cache_directory, get_polkadot_sdk_versions_from_cache};
 
 pub const DEFAULT_GIT_SERVER: &str = "https://raw.githubusercontent.com";
-pub const DEFAULT_CACHE_PATH: &str = "./target/cache.json";
 
 /// Polkadot SDK Version Manager.
 ///
@@ -87,9 +86,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cmd.update_cache {
         log::info!("Updating cache by freshly fetching versions from GitHub");
         let versions = get_polkadot_sdk_versions().await?;
-        let cache_path = PathBuf::from("./cache.json");
+        let cache_dir = if let Some(cache_directory) = get_cache_directory() {
+            cache_directory
+        } else {
+            return Err("Could not determine cache directory".into());
+        };
         let cache = cache::Cache { data: versions };
-        cache.save(&cache_path)?;
+        cache.save(&cache_dir)?;
         return Ok(());
     }
 

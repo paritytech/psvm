@@ -37,7 +37,7 @@ impl Cache {
     }
 }
 
-fn get_cache_directory() -> Option<PathBuf> {
+pub fn get_cache_directory() -> Option<PathBuf> {
     if let Some(cache_dir) = dirs::cache_dir() {
         let app_cache_dir = cache_dir.join("psvm/cache.json");
         Some(app_cache_dir)
@@ -78,9 +78,9 @@ fn get_cache_directory() -> Option<PathBuf> {
 /// ```
 pub async fn get_polkadot_sdk_versions_from_cache(
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    // Path to the cache file. should save as a constant once path is finalized
-    let cache_path = get_cache_directory().unwrap(); // Can unwrap because we know the cache directory exists
-                                                     // Attempt to load the cache
+    // Can unwrap because we know the cache directory exists
+    let cache_path = get_cache_directory().unwrap();
+    // Attempt to load the cache
     let cache = Cache::load(&cache_path);
 
     let data = if let Ok(cache) = cache {

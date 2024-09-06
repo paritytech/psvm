@@ -88,8 +88,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // This version has the Plan.toml file, so it will not fallback to Cargo.lock
-    // and check if the versions in the local toml file comply with the Plan.toml file
+    // Save the Polkadot SDK versions in a cache file
     async fn test_saving_cache_works() {
         let cache_file_path: PathBuf = PathBuf::from("src/testing/cache.json");
         let cache_data = get_polkadot_sdk_versions().await.unwrap();
@@ -103,8 +102,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // This version has the Plan.toml file, so it will not fallback to Cargo.lock
-    // and check if the versions in the local toml file comply with the Plan.toml file
+    // Caches the Polkadot SDK versions in a file, then overwrites the cache with the same data
     async fn test_overwriting_cache_works() {
         let cache_file_path: PathBuf = PathBuf::from("src/testing/cache.json");
         let cache_data = get_polkadot_sdk_versions().await.unwrap();
@@ -123,8 +121,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // This version has the Plan.toml file, so it will not fallback to Cargo.lock
-    // and check if the versions in the local toml file comply with the Plan.toml file
+    // Loads the data from the cache file and checks if it matches the data that was cached
     async fn test_loading_cache_works() {
         let cache_file_path: PathBuf = PathBuf::from("src/testing/cache.json");
         let cache_data = get_polkadot_sdk_versions().await.unwrap();
@@ -141,8 +138,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // This version has the Plan.toml file, so it will not fallback to Cargo.lock
-    // and check if the versions in the local toml file comply with the Plan.toml file
+    // Tries to load the cache from a nonexistent file, which should fail
     async fn test_loading_cache_from_nonexistent_file_fails() {
         let cache_file_path: PathBuf = PathBuf::from("non/existing/path/cache.json");
 

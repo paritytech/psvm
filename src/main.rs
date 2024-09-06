@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod cache;
 mod tests;
 mod versions;
 
@@ -29,6 +30,8 @@ use versions::{
     get_version_mapping_with_fallback, include_orml_crates_in_version_mapping, Repository,
 };
 
+use cache::{get_cache_directory, get_polkadot_sdk_versions_from_cache};
+
 pub const DEFAULT_GIT_SERVER: &str = "https://raw.githubusercontent.com";
 
 /// Polkadot SDK Version Manager.
@@ -42,7 +45,12 @@ struct Command {
     path: PathBuf,
 
     /// Specifies the Polkadot SDK version. Use '--list' flag to display available versions.
-    #[clap(short, long, required_unless_present = "list")]
+    #[clap(
+        short,
+        long,
+        required_unless_present = "list",
+        required_unless_present = "update_cache"
+    )]
     version: Option<String>,
 
     /// Overwrite local dependencies (using path) with same name as the ones in the Polkadot SDK.
@@ -60,6 +68,14 @@ struct Command {
     /// To either list available ORML versions or update the Cargo.toml file with corresponding ORML versions.
     #[clap(short('O'), long)]
     orml: bool,
+
+    /// To read the list of available versions from cache.
+    #[clap(short('C'), long)]
+    cache: bool,
+
+    /// To update the cache having the list of available versions.
+    #[clap(short('u'), long)]
+    update_cache: bool,
 }
 
 #[tokio::main]
@@ -67,16 +83,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let cmd = Command::parse();
 
-    if cmd.list {
-        let crates_versions = if cmd.orml {
-            get_release_branches_versions(Repository::Orml).await?
+    if cmd.update_cache {
+        log::info!("Updating cache by freshly fetching versions from GitHub");
+        let versions = get_polkadot_sdk_versions().await?;
+        let cache_dir = if let Some(cache_directory) = get_cache_directory() {
+            cache_directory
         } else {
-            get_polkadot_sdk_versions().await?
+            return Err("Could not determine cache directory".into());
         };
+        let cache = cache::Cache { data: versions };
+        cache.save(&cache_dir)?;
+        return Ok(());
+    }
 
-        println!("Available versions:");
-        for version in crates_versions.iter() {
-            println!("- {}", version);
+    if cmd.list {
+        if cmd.orml {
+            print_version_list(get_release_branches_versions(Repository::Orml).await?);
+        } else if cmd.cache {
+            log::info!("Reading versions from cache");
+            print_version_list(get_polkadot_sdk_versions_from_cache().await?);
+        } else {
+            log::info!("Fetching versions from GitHub");
+            print_version_list(get_polkadot_sdk_versions().await?);
         }
         return Ok(());
     }
@@ -97,6 +125,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite, cmd.check)?;
 
     Ok(())
+}
+
+fn print_version_list(crates_versions: Vec<String>) {
+    println!("Available versions:");
+    for version in crates_versions.iter() {
+        println!("- {}", version);
+    }
 }
 
 fn validate_workspace_path(mut path: PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {

@@ -28,6 +28,10 @@ If you want to check if the dependencies in your local Cargo.toml file are match
 
 If you want to update the ORML crates in your local Cargo.toml, you can use the `-O` or `--orml` flag along with the `--version` flag to update the ORML crates along with the polkadot-sdk crates. This works only if the supplied version is present in the ORML releases.
 
+If you want to fetch available polkadot-sdk versions from a local cache, or want to just cache the versions list if using for the first time, you can use the `-C` or `--cache` flag alongside the `--list` flag.
+
+If you want to update the local cache with a freshly fetched list of versions from GitHub, you can use the `-u` or `--update-cache` flag.
+
 ```sh
 # Go to the directory containing the Cargo.toml file you want to update
 cd <cargo-toml-dir>
@@ -43,6 +47,10 @@ psvm -l
 psvm -v "1.4.0" -c
 # Update the ORML dependencies along with the Polkadot SDK dependencies.
 psvm -v "1.6.0" -O
+# Update the local cache with freshly fetched list of versions from GitHub
+psvm -u
+# Fetch the list of versions from the local cache
+psvm --list --cache
 ```
 
 > Listing all available Polkadot SDK versions requires querying the GitHub API, so your IP may be rate-limited. If a rate limit is reached, the tool will fallback to the GitHub CLI to list the versions. Ensure you have the GitHub CLI installed and authenticated to avoid any issue.

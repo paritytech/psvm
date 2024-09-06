@@ -1,6 +1,6 @@
 [package]
 name = "psvm"
-version = "0.2.4"
+version = "0.2.5"
 description = "A tool to manage and update the Polkadot SDK dependencies in any Cargo.toml file."
 repository = "https://github.com/paritytech/psvm"
 authors = ["Parity Technologies <admin@parity.io>", "Patricio (patriciobcs)"]
@@ -19,6 +19,7 @@ env_logger = "0.11.3"
 reqwest = { version = "0.12.3", features = ["json"] }
 toml = "0.8.12"
 tokio = { version = "1.37.0", features = ["full"] }
+dirs = "3.0"
 
 [dev-dependencies]
 tokio-test = "0.4"

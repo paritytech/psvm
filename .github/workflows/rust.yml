@@ -1,5 +1,9 @@
 name: Rust
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ "main" ]
@@ -34,3 +38,6 @@ jobs:
         psvm -v stable2407-2
         psvm -v 1.13.0
         psvm -l
+    
+    - name: Fmt
+      run: cargo fmt --all -- --check

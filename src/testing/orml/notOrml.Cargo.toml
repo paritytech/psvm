@@ -33,7 +33,7 @@ orml-xtokens = { git = "https://github.com/open-web3-stack/open-runtime-module-l
 frame-benchmarking = { version = "36.0.0", default-features = false, optional = true }
 frame-executive = { version = "36.0.0", default-features = false }
 frame-support = { version = "36.0.0", default-features = false }
-frame-system = { version = "36.0.0", default-features = false }
+frame-system = { version = "36.1.0", default-features = false }
 frame-system-benchmarking = { version = "36.0.0", default-features = false, optional = true }
 frame-system-rpc-runtime-api = { version = "33.0.0", default-features = false }
 frame-try-runtime = { version = "0.42.0", default-features = false, optional = true }
@@ -62,7 +62,7 @@ sp-version = { version = "36.0.0", default-features = false }
 pallet-xcm = { version = "15.0.0", default-features = false }
 polkadot-parachain-primitives = { version = "13.0.0", default-features = false }
 polkadot-runtime-common = { version = "15.0.0", default-features = false }
-xcm = { version = "14.0.1", package = "staging-xcm", default-features = false }
+xcm = { version = "14.0.3", package = "staging-xcm", default-features = false }
 xcm-builder = { version = "15.0.0", package = "staging-xcm-builder", default-features = false }
 xcm-executor = { version = "15.0.0", package = "staging-xcm-executor", default-features = false }
 

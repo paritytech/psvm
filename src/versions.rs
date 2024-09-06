@@ -15,6 +15,7 @@
 
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
+use regex::Regex;
 
 /// Represents the structure of a Cargo.lock file, including all packages.
 #[derive(Debug, Deserialize)]
@@ -86,6 +87,102 @@ pub struct Workspace {
     metadata: Metadata,
 }
 
+/// Represents a tag by its name.
+#[derive(Deserialize, Debug)]
+pub struct TagInfo {
+    /// The name of the tag.
+    pub name: String,
+}
+
+const POLKADOT_SDK_TAGS_URL: &str = "https://api.github.com/repos/paritytech/polkadot-sdk/tags?per_page=100&page=";
+const POLKADOT_SDK_TAGS_GH_CMD_URL: &str = "/repos/paritytech/polkadot-sdk/tags?per_page=100&page=";
+const POLKADOT_SDK_STABLE_TAGS_REGEX: &str = r"^polkadot-stable\d+(-\d+)?$";
+
+/// Fetches a combined list of Polkadot SDK release versions and stable tag releases.
+///
+/// This function first retrieves release branch versions from the Polkadot SDK and 
+/// then fetches stable tag releases versions. It combines these two lists into a 
+/// single list of version strings.
+///
+/// # Returns
+/// A `Result` containing either a `Vec<String>` of combined version names on success,
+/// or an `Error` if any part of the process fails.
+///
+/// # Errors
+/// This function can return an error if either the fetching of release branches versions
+/// or the fetching of stable tag versions encounters an issue.
+pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let mut crates_io_releases = get_release_branches_versions(Repository::Psdk).await?;
+    let mut stable_tag_versions = get_stable_tag_versions().await?;
+    crates_io_releases.append(&mut stable_tag_versions);
+    Ok(crates_io_releases)
+}
+
+/// Fetches a list of stable tag versions for the Polkadot SDK from GitHub.
+///
+/// This function queries GitHub's API to retrieve tags for the Polkadot SDK,
+/// filtering them based on a predefined regex to identify stable versions.
+/// If the direct API request fails, it falls back to using the GitHub CLI.
+///
+/// # Returns
+/// A `Result` containing either a `Vec<String>` of stable tag names on success,
+/// or an `Error` if any part of the process fails.
+///
+/// # Errors
+/// This function can return an error if the HTTP request fails, if parsing the
+/// response into text fails, if executing the GitHub CLI command fails, or if
+/// parsing the JSON response into `Vec<TagInfo>` fails.
+pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let mut release_tags = vec![];
+    
+    for page in 1..100 {
+        let response = reqwest::Client::new()
+        .get(format!("{}{}", POLKADOT_SDK_TAGS_URL, page))
+        .header("User-Agent", "reqwest")
+        .header("Accept", "application/vnd.github.v3+json")
+        .send()
+        .await?;
+    
+        let output = if response.status().is_success() {
+            response.text().await?
+        } else {
+            // query the github api using gh command
+            String::from_utf8(
+                std::process::Command::new("gh")
+                .args([
+                    "api",
+                    "-H",
+                    "Accept: application/vnd.github+json",
+                    "-H",
+                    "X-GitHub-Api-Version: 2022-11-28",
+                    &format!("{}{}", POLKADOT_SDK_TAGS_GH_CMD_URL, page),
+                    ])
+                    .output()?
+                    .stdout,
+                )?
+            };
+        
+        let tag_branches: Vec<TagInfo> = serde_json::from_str(&output)?;
+        let tag_regex = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
+        
+        let stable_tag_branches = tag_branches
+            .iter()
+            .filter(|b| tag_regex.is_match(&b.name))
+            .map(|branch| branch.name.to_string());
+
+            release_tags = release_tags
+                .into_iter()
+                .chain(stable_tag_branches)
+                .collect();
+
+        if tag_branches.len() < 100 {
+            break;
+        }
+    }
+
+    Ok(release_tags)
+}
+
 /// Fetches the ORML crates and their versions for a specific version of Polkadot.
 ///
 /// This function queries a repository for a specific version of the ORML crates,
@@ -146,7 +243,7 @@ pub async fn get_orml_crates_and_version(
         let content = response.text().await?;
 
         let orml_workspace_members = toml::from_str::<OrmlToml>(&content)
-            .map_err(|_| return "Error Parsing ORML TOML. Required Fields not Found")?;
+            .map_err(|_| "Error Parsing ORML TOML. Required Fields not Found")?;
         Ok(Some(orml_workspace_members))
     } else {
         log::error!(
@@ -205,7 +302,8 @@ pub async fn get_version_mapping_with_fallback(
 }
 
 fn version_to_url(base_url: &str, version: &str, source: &str) -> String {
-    let version = if version.starts_with("stable") {
+    let stable_tag_regex_patten = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
+    let version = if version.starts_with("stable") || stable_tag_regex_patten.is_match(version) {
         version.into()
     } else {
         format!("release-crates-io-v{}", version)
@@ -327,7 +425,7 @@ fn get_repository_info(repository: &Repository) -> RepositoryInfo {
         },
         Repository::Psdk => RepositoryInfo {
             branches_url: "https://api.github.com/repos/paritytech/polkadot-sdk/branches?per_page=100&page=".into(),
-            gh_cmd_url: "/repos/paritytech/polkadot-sdk/branches/per_page=100&page={}".into(),
+            gh_cmd_url: "/repos/paritytech/polkadot-sdk/branches?per_page=100&page=".into(),
             version_filter_string: "release-crates-io-v".into(),
             version_replace_string: "release-crates-io-v".into()
         },
@@ -413,8 +511,7 @@ pub async fn get_release_branches_versions(
             .filter(|b| b.name.starts_with(&repository_info.version_filter_string))
             .filter(|b| (b.name != "polkadot-v1.0.0")) // This is in place to filter that particular orml version as it is not a valid polkadot-sdk release version
             .map(|branch| {
-                branch
-                    .name
+                branch.name
                     .replace(&repository_info.version_replace_string, "")
             });
 

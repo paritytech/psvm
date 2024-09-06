@@ -21,15 +21,12 @@ use env_logger::Env;
 use std::{
     collections::BTreeMap,
     fs,
-    path::{ Path, PathBuf, },
+    path::{Path, PathBuf},
 };
 use toml_edit::DocumentMut;
 use versions::{
-    get_orml_crates_and_version,
-    get_release_branches_versions,
-    get_version_mapping_with_fallback,
-    include_orml_crates_in_version_mapping,
-    Repository,
+    get_orml_crates_and_version, get_polkadot_sdk_versions, get_release_branches_versions,
+    get_version_mapping_with_fallback, include_orml_crates_in_version_mapping, Repository,
 };
 
 pub const DEFAULT_GIT_SERVER: &str = "https://raw.githubusercontent.com";
@@ -74,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let crates_versions = if cmd.orml {
             get_release_branches_versions(Repository::Orml).await?
         } else {
-            get_release_branches_versions(Repository::Psdk).await?
+            get_polkadot_sdk_versions().await?
         };
 
         println!("Available versions:");
@@ -102,7 +99,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn validate_workspace_path(mut path: PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn validate_workspace_path(
+    mut path: PathBuf,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if path.is_dir() {
         path = path.join("Cargo.toml");
     }

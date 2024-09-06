@@ -1,6 +1,6 @@
 [package]
 name = "psvm"
-version = "0.2.4"
+version = "0.2.5"
 description = "A tool to manage and update the Polkadot SDK dependencies in any Cargo.toml file."
 repository = "https://github.com/paritytech/psvm"
 authors = ["Parity Technologies <admin@parity.io>", "Patricio (patriciobcs)"]

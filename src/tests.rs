@@ -80,8 +80,15 @@ mod tests {
                 .unwrap();
 
         // Compare line-by-line so we can debug the first mismatch
-        let result_lines = result.unwrap().lines().map(|line| line.to_string()).collect::<Vec<String>>();
-        let expected_lines = expected_cargo_toml.lines().map(|line| line.to_string()).collect::<Vec<String>>();
+        let result_lines = result
+            .unwrap()
+            .lines()
+            .map(|line| line.to_string())
+            .collect::<Vec<String>>();
+        let expected_lines = expected_cargo_toml
+            .lines()
+            .map(|line| line.to_string())
+            .collect::<Vec<String>>();
         assert_eq!(result_lines.len(), expected_lines.len());
         for (result_line, expected_line) in result_lines.iter().zip(expected_lines.iter()) {
             assert_eq!(result_line, expected_line);

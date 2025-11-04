@@ -211,6 +211,8 @@ pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error
 /// # Examples
 ///
 /// ```
+/// use psvm::get_orml_crates_and_version;
+///
 /// #[tokio::main]
 /// async fn main() {
 ///     let base_url = "https://raw.githubusercontent.com";
@@ -271,8 +273,16 @@ pub async fn get_orml_crates_and_version(
 /// # Examples
 ///
 /// ```
+/// use psvm::include_orml_crates_in_version_mapping;
+/// use std::collections::BTreeMap;
+///
+/// // Assuming you have obtained orml_toml from get_orml_crates_and_version
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut version_map: BTreeMap<String, String> = BTreeMap::new();
-/// include_orml_crates_in_version_mapping(&mut version_map, Some(orml_toml));
+/// let orml_toml = psvm::get_orml_crates_and_version("https://raw.githubusercontent.com", "1.12.0").await?;
+/// include_orml_crates_in_version_mapping(&mut version_map, orml_toml);
+/// # Ok(())
+/// # }
 /// ```
 pub fn include_orml_crates_in_version_mapping(
     crates_versions: &mut BTreeMap<String, String>,
@@ -461,7 +471,9 @@ fn get_repository_info(repository: &Repository) -> RepositoryInfo {
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```
+/// use psvm::{Repository, get_release_branches_versions};
+///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let orml_repository = Repository::Orml;

@@ -239,17 +239,18 @@ publish = false
         let source = "Plan.toml";
 
         let mut server = mockito::Server::new_async().await;
-        let _m = server.mock(
-            "GET",
-            format!(
-                "/paritytech/polkadot-sdk/release-crates-io-v{}/{}",
-                version, source
+        let _m = server
+            .mock(
+                "GET",
+                format!(
+                    "/paritytech/polkadot-sdk/release-crates-io-v{}/{}",
+                    version, source
+                )
+                .as_str(),
             )
-            .as_str(),
-        )
-        .with_status(200)
-        .with_body(response)
-        .create();
+            .with_status(200)
+            .with_body(response)
+            .create();
 
         let git_server = &server.url();
         let mapping = get_version_mapping_with_fallback(git_server, version)
@@ -277,17 +278,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
         let source = "Cargo.lock";
 
         let mut server = mockito::Server::new_async().await;
-        let _m = server.mock(
-            "GET",
-            format!(
-                "/paritytech/polkadot-sdk/release-crates-io-v{}/{}",
-                version, source
+        let _m = server
+            .mock(
+                "GET",
+                format!(
+                    "/paritytech/polkadot-sdk/release-crates-io-v{}/{}",
+                    version, source
+                )
+                .as_str(),
             )
-            .as_str(),
-        )
-        .with_status(200)
-        .with_body(response)
-        .create();
+            .with_status(200)
+            .with_body(response)
+            .create();
 
         let git_server = &server.url();
         let mapping = get_version_mapping_with_fallback(git_server, version)

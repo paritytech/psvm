@@ -47,6 +47,40 @@ psvm -v "1.6.0" -O
 
 > Listing all available Polkadot SDK versions requires querying the GitHub API, so your IP may be rate-limited. If a rate limit is reached, the tool will fallback to the GitHub CLI to list the versions. Ensure you have the GitHub CLI installed and authenticated to avoid any issue.
 
+## Using as a Library
+
+You can use `psvm` as a library in your Rust project by adding it to your `Cargo.toml`:
+
+```toml
+[dependencies]
+psvm = "0.2"
+```
+
+Basic usage example:
+
+```rust
+use psvm::{get_version_mapping_with_fallback, update_dependencies};
+use std::path::Path;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Fetch version mappings for a specific Polkadot SDK version
+    let version = "1.14.0";
+    let crates_versions = get_version_mapping_with_fallback(
+        "https://raw.githubusercontent.com",
+        version
+    ).await?;
+    
+    // Update dependencies in a Cargo.toml file
+    let cargo_toml_path = Path::new("path/to/Cargo.toml");
+    update_dependencies(cargo_toml_path, &crates_versions, false, false)?;
+    
+    Ok(())
+}
+```
+
+See the [API documentation](https://docs.rs/psvm) for more details on available functions.
+
 ## Workflow
 
 To update a `Cargo.toml`, the tool will fetch the `Plan.toml` file (used to publish crates into crates.io) from the release branch in Polkadot SDK associated to the version input (`--version` argument), generate a mapping (crate -> version) filtering all crates that were not published in this released (i.e. `publish = false`) **but keeping the [crates published by `parity-crate_owner`](https://crates.io/users/parity-crate-owner) (even if they were not published in this release)**, and overwrite the input Cargo.toml file to match the version from the mapping (i.e [v1.6.0 `Plan.toml`](https://raw.githubusercontent.com/paritytech/polkadot-sdk/release-crates-io-v1.6.0/Plan.toml)).

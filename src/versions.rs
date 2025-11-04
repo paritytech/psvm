@@ -135,6 +135,7 @@ pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::err
 /// parsing the JSON response into `Vec<TagInfo>` fails.
 pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut release_tags = vec![];
+    let tag_regex = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
 
     for page in 1..100 {
         let response = reqwest::Client::new()
@@ -164,7 +165,6 @@ pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error
         };
 
         let tag_branches: Vec<TagInfo> = serde_json::from_str(&output)?;
-        let tag_regex = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
 
         let stable_tag_branches = tag_branches
             .iter()
@@ -514,7 +514,7 @@ pub async fn get_release_branches_versions(
         let version_branches = branches
             .iter()
             .filter(|b| b.name.starts_with(&repository_info.version_filter_string))
-            .filter(|b| (b.name != "polkadot-v1.0.0")) // This is in place to filter that particular orml version as it is not a valid polkadot-sdk release version
+            .filter(|b| b.name != "polkadot-v1.0.0") // This is in place to filter that particular orml version as it is not a valid polkadot-sdk release version
             .map(|branch| {
                 branch
                     .name

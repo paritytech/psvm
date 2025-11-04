@@ -79,8 +79,20 @@ mod tests {
             crate::update_dependencies_impl(&input_cargo_toml_path, &crates_versions, false, false)
                 .unwrap();
 
-        // Assert that the result matches the expected output
-        assert_eq!(result, Some(expected_cargo_toml.into()));
+        // Compare line-by-line so we can debug the first mismatch
+        let result_lines = result
+            .unwrap()
+            .lines()
+            .map(|line| line.to_string())
+            .collect::<Vec<String>>();
+        let expected_lines = expected_cargo_toml
+            .lines()
+            .map(|line| line.to_string())
+            .collect::<Vec<String>>();
+        assert_eq!(result_lines.len(), expected_lines.len());
+        for (result_line, expected_line) in result_lines.iter().zip(expected_lines.iter()) {
+            assert_eq!(result_line, expected_line);
+        }
     }
 
     #[tokio::test]

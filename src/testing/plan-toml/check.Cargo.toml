@@ -55,7 +55,7 @@ sp-version = { version = "36.0.0", default-features = false }
 pallet-xcm = { version = "15.0.0", default-features = false }
 polkadot-parachain-primitives = { version = "13.0.0", default-features = false }
 polkadot-runtime-common = { version = "15.0.0", default-features = false }
-xcm = { version = "14.0.3", package = "staging-xcm", default-features = false }
+xcm = { version = "=14.0.3", package = "staging-xcm", default-features = false }
 xcm-builder = { version = "15.0.0", package = "staging-xcm-builder", default-features = false }
 xcm-executor = { version = "15.0.0", package = "staging-xcm-executor", default-features = false }
 

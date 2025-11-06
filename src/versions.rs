@@ -135,6 +135,7 @@ pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::err
 /// parsing the JSON response into `Vec<TagInfo>` fails.
 pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut release_tags = vec![];
+    let tag_regex = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
 
     for page in 1..100 {
         let response = reqwest::Client::new()
@@ -164,7 +165,6 @@ pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error
         };
 
         let tag_branches: Vec<TagInfo> = serde_json::from_str(&output)?;
-        let tag_regex = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
 
         let stable_tag_branches = tag_branches
             .iter()
@@ -211,6 +211,8 @@ pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error
 /// # Examples
 ///
 /// ```
+/// use psvm::get_orml_crates_and_version;
+///
 /// #[tokio::main]
 /// async fn main() {
 ///     let base_url = "https://raw.githubusercontent.com";
@@ -271,8 +273,16 @@ pub async fn get_orml_crates_and_version(
 /// # Examples
 ///
 /// ```
+/// use psvm::include_orml_crates_in_version_mapping;
+/// use std::collections::BTreeMap;
+///
+/// // Assuming you have obtained orml_toml from get_orml_crates_and_version
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut version_map: BTreeMap<String, String> = BTreeMap::new();
-/// include_orml_crates_in_version_mapping(&mut version_map, Some(orml_toml));
+/// let orml_toml = psvm::get_orml_crates_and_version("https://raw.githubusercontent.com", "1.12.0").await?;
+/// include_orml_crates_in_version_mapping(&mut version_map, orml_toml);
+/// # Ok(())
+/// # }
 /// ```
 pub fn include_orml_crates_in_version_mapping(
     crates_versions: &mut BTreeMap<String, String>,
@@ -461,7 +471,9 @@ fn get_repository_info(repository: &Repository) -> RepositoryInfo {
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```
+/// use psvm::{Repository, get_release_branches_versions};
+///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let orml_repository = Repository::Orml;
@@ -514,7 +526,7 @@ pub async fn get_release_branches_versions(
         let version_branches = branches
             .iter()
             .filter(|b| b.name.starts_with(&repository_info.version_filter_string))
-            .filter(|b| (b.name != "polkadot-v1.0.0")) // This is in place to filter that particular orml version as it is not a valid polkadot-sdk release version
+            .filter(|b| b.name != "polkadot-v1.0.0") // This is in place to filter that particular orml version as it is not a valid polkadot-sdk release version
             .map(|branch| {
                 branch
                     .name

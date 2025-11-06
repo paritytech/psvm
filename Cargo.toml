@@ -9,17 +9,17 @@ include = ["src/**/*", "Cargo.toml"]
 license = "Apache-2.0 OR GPL-3.0"
 
 [dependencies]
-regex = "1.10.6"
-clap = { version = "4.5", features = ["derive"] }
-toml_edit = "0.22.9"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-log = "0.4.21"
-env_logger = "0.11.3"
-reqwest = { version = "0.12.3", features = ["json"] }
-toml = "0.8.12"
-tokio = { version = "1.37.0", features = ["full"] }
+regex = "1.12.2"
+clap = { version = "4.5.51", features = ["derive"] }
+toml_edit = "0.23.7"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+log = "0.4.28"
+env_logger = "0.11.8"
+reqwest = { version = "0.12.24", features = ["json"] }
+toml = "0.9.8"
+tokio = { version = "1.48.0", features = ["full"] }
 
 [dev-dependencies]
-tokio-test = "0.4"
-mockito = "0.30"
+tokio-test = "0.4.4"
+mockito = "1.7.0"

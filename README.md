@@ -45,7 +45,7 @@ psvm -v "1.4.0" -c
 psvm -v "1.6.0" -O
 ```
 
-> Listing all available Polkadot SDK versions requires querying the GitHub API, so your IP may be rate-limited. If a rate limit is reached, the tool will fallback to the GitHub CLI to list the versions. Ensure you have the GitHub CLI installed and authenticated to avoid any issue.
+> Listing all available Polkadot SDK versions requires querying the GitHub API, so your IP may be rate-limited. If a rate limit is reached, the tool will fallback to the GitHub CLI to list the versions. Ensure you have the GitHub CLI installed and authenticated to avoid any issue, or you can alternatively set the `GITHUB_TOKEN` environment variable to your GitHub API token.
 
 ## Using as a Library
 

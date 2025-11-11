@@ -86,7 +86,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates);
     }
 
-    update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite, cmd.check)?;
+    if update_dependencies(&cargo_toml_path, &crates_versions, cmd.overwrite, cmd.check)? {
+        println!("Updated dependencies in {}", cargo_toml_path.display());
+    } else {
+        println!(
+            "Dependencies in {} are already up to date",
+            cargo_toml_path.display()
+        );
+    }
 
     Ok(())
 }

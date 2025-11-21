@@ -72,6 +72,12 @@ pub fn validate_workspace_path(mut path: PathBuf) -> Result<PathBuf, Box<dyn std
 /// * `overwrite` - If true, will overwrite local path dependencies
 /// * `only_check` - If true, only checks if dependencies match without updating
 ///
+/// # Returns
+///
+/// Returns `Ok(bool)` where:
+/// - `true` indicates dependencies were updated.
+/// - `false` indicates no updates were needed.
+///
 /// # Errors
 ///
 /// Returns an error if:
@@ -83,24 +89,18 @@ pub fn update_dependencies(
     crates_versions: &BTreeMap<String, String>,
     overwrite: bool,
     only_check: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<bool, Box<dyn std::error::Error>> {
     let cargo_toml =
         update_dependencies_impl(cargo_toml_path, crates_versions, overwrite, only_check)?;
 
-    match cargo_toml {
-        Some(new_content) => {
-            fs::write(cargo_toml_path, new_content)?;
-            println!("Updated dependencies in {}", cargo_toml_path.display());
-        }
-        None => {
-            println!(
-                "Dependencies in {} are already up to date",
-                cargo_toml_path.display()
-            );
-        }
-    }
+    let updated = if let Some(new_content) = cargo_toml {
+        fs::write(cargo_toml_path, new_content)?;
+        true
+    } else {
+        false
+    };
 
-    Ok(())
+    Ok(updated)
 }
 
 /// Internal implementation of dependency update logic.

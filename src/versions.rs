@@ -119,6 +119,19 @@ pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::err
     Ok(crates_io_releases)
 }
 
+async fn github_query(url: &str) -> Result<reqwest::Response, reqwest::Error> {
+    let mut builder = reqwest::Client::new()
+        .get(url)
+        .header("User-Agent", "reqwest")
+        .header("Accept", "application/vnd.github.v3+json");
+
+    if let Ok(token) = std::env::var("GITHUB_TOKEN") {
+        builder = builder.header("Authorization", format!("Bearer {}", token))
+    };
+
+    builder.send().await
+}
+
 /// Fetches a list of stable tag versions for the Polkadot SDK from GitHub.
 ///
 /// This function queries GitHub's API to retrieve tags for the Polkadot SDK,
@@ -138,13 +151,7 @@ pub async fn get_stable_tag_versions() -> Result<Vec<String>, Box<dyn std::error
     let tag_regex = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
 
     for page in 1..100 {
-        let response = reqwest::Client::new()
-            .get(format!("{}{}", POLKADOT_SDK_TAGS_URL, page))
-            .header("User-Agent", "reqwest")
-            .header("Accept", "application/vnd.github.v3+json")
-            .send()
-            .await?;
-
+        let response = github_query(&format!("{}{}", POLKADOT_SDK_TAGS_URL, page)).await?;
         let output = if response.status().is_success() {
             response.text().await?
         } else {
@@ -236,13 +243,7 @@ pub async fn get_orml_crates_and_version(
             "{}/open-web3-stack/open-runtime-module-library/polkadot-v{}/Cargo.dev.toml",
             base_url, version
         );
-        let response = reqwest::Client::new()
-            .get(&version_url)
-            .header("User-Agent", "reqwest")
-            .header("Accept", "application/vnd.github.v3+json")
-            .send()
-            .await?;
-
+        let response = github_query(&version_url).await?;
         let content = response.text().await?;
 
         let orml_workspace_members = toml::from_str::<OrmlToml>(&content)
@@ -332,12 +333,7 @@ pub async fn get_version_mapping(
     source: &str,
 ) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error>> {
     let url = version_to_url(base_url, version, source);
-    let response = reqwest::Client::new()
-        .get(&url)
-        .header("User-Agent", "reqwest")
-        .header("Accept", "application/vnd.github.v3+json")
-        .send()
-        .await?;
+    let response = github_query(&url).await?;
 
     let content = match response.error_for_status() {
         Ok(response) => response.text().await?,
@@ -495,13 +491,7 @@ pub async fn get_release_branches_versions(
 
     for page in 1..100 {
         // currently there's 5 pages, so 100 should be enough
-        let response = reqwest::Client::new()
-            .get(format!("{}{}", repository_info.branches_url, page))
-            .header("User-Agent", "reqwest")
-            .header("Accept", "application/vnd.github.v3+json")
-            .send()
-            .await?;
-
+        let response = github_query(&format!("{}{}", repository_info.branches_url, page)).await?;
         let output = if response.status().is_success() {
             response.text().await?
         } else {

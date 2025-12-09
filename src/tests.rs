@@ -301,6 +301,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
     }
 
     #[tokio::test]
+    async fn test_explicit_git_ref_is_used() {
+        let response = r#"
+[[crate]]
+name = "package_minor"
+from = "0.1.0"
+to = "0.2.0"
+"#;
+        let git_ref = "polkadot-unstable-custom";
+        let source = "Plan.toml";
+
+        let mut server = mockito::Server::new_async().await;
+        let _m = server
+            .mock(
+                "GET",
+                format!("/paritytech/polkadot-sdk/{}/{}", git_ref, source).as_str(),
+            )
+            .with_status(200)
+            .with_body(response)
+            .create();
+
+        let mapping = get_version_mapping_with_fallback(&server.url(), git_ref)
+            .await
+            .unwrap();
+
+        assert_eq!(mapping.len(), 1);
+        assert_eq!(mapping.get("package_minor"), Some(&"0.2.0".to_string()));
+    }
+
+    #[tokio::test]
     // This test will fetch all available versions, update a generic parachain Cargo.toml file
     // and assert that the Cargo.toml file has been updated (modified)
     // This is not exhaustive, but it's a good way to ensure that the logic works for all versions

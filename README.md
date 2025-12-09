@@ -24,6 +24,8 @@ If you want to update the local dependencies (using `path="..."`), you can use t
 
 If you want to update the dependencies to a specific Polkadot SDK version, you can use the `-v` or `--version` flag, followed by the version you want to update to.
 
+If you need to point at a specific git branch or tag (for example an unstable tag), use `--ref` with the branch/tag name that contains the release metadata. `--ref` is an alternative to `--version`; they cannot be used together.
+
 If you want to check if the dependencies in your local Cargo.toml file are matching to a specific Polkadot SDK version, you can use the `-c` or `--check` flag along with the `--version` flag followed by the version you want to check against.
 
 If you want to update the ORML crates in your local Cargo.toml, you can use the `-O` or `--orml` flag along with the `--version` flag to update the ORML crates along with the polkadot-sdk crates. This works only if the supplied version is present in the ORML releases.
@@ -37,6 +39,8 @@ psvm -v "1.3.0"
 psvm -v "1.4.0" -p <cargo-toml-dir>/Cargo.toml
 # Overwrite local dependencies (with same name as Polkadot SDK crates) with crates.io versions
 psvm -v "1.7.0" -o
+# Use a specific git branch or tag that already includes Plan.toml/Cargo.lock
+psvm --ref polkadot-unstable2507-revive
 # List all available Polkadot SDK versions
 psvm -l
 # Check against a particular Polkadot SDK version without updating the Cargo.toml file

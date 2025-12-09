@@ -34,7 +34,12 @@ struct Command {
     path: PathBuf,
 
     /// Specifies the Polkadot SDK version. Use '--list' flag to display available versions.
-    #[clap(short, long, required_unless_present = "list")]
+    #[clap(
+        short,
+        long,
+        required_unless_present_any = ["list", "git_ref"],
+        conflicts_with = "git_ref"
+    )]
     version: Option<String>,
 
     /// Overwrite local dependencies (using path) with same name as the ones in the Polkadot SDK.
@@ -50,8 +55,12 @@ struct Command {
     check: bool,
 
     /// To either list available ORML versions or update the Cargo.toml file with corresponding ORML versions.
-    #[clap(short('O'), long)]
+    #[clap(short('O'), long, requires = "version")]
     orml: bool,
+
+    /// Explicit git reference (branch or tag) to fetch release metadata from.
+    #[clap(long = "ref", conflicts_with = "version")]
+    git_ref: Option<String>,
 }
 
 #[tokio::main]
@@ -73,16 +82,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let version = cmd.version.unwrap(); // Safe to unwrap due to `required_unless_present`
+    let version_or_ref = cmd
+        .version
+        .as_deref()
+        .or(cmd.git_ref.as_deref())
+        .expect("clap enforces presence of either version or git_ref");
 
     let cargo_toml_path = validate_workspace_path(cmd.path)?;
 
     // Decide which branch data to use based on the branch name
     let mut crates_versions: BTreeMap<String, String> =
-        get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, &version).await?;
+        get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, version_or_ref).await?;
 
     if cmd.orml {
-        let orml_crates = get_orml_crates_and_version(DEFAULT_GIT_SERVER, &version).await?;
+        let version = cmd
+            .version
+            .as_deref()
+            .expect("ORML lookups require a version");
+        let orml_crates = get_orml_crates_and_version(DEFAULT_GIT_SERVER, version).await?;
         include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates);
     }
 

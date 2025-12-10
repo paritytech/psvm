@@ -317,6 +317,8 @@ fn version_to_url(base_url: &str, version: &str, source: &str) -> String {
         format!("polkadot-{}", version)
     } else if stable_tag_regex_patten.is_match(version) {
         version.into()
+    } else if version.starts_with("polkadot-unstable") {
+        version.into()
     } else {
         format!("release-crates-io-v{}", version)
     };

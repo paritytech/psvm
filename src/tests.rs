@@ -330,6 +330,79 @@ to = "0.2.0"
     }
 
     #[tokio::test]
+    // Fetches the latest release version and verifies it returns a non-empty string
+    // that can be used to fetch a valid version mapping.
+    async fn test_get_latest_version() {
+        let latest = crate::versions::get_latest_polkadot_sdk_version()
+            .await
+            .unwrap();
+
+        assert!(!latest.is_empty(), "Latest version should not be empty");
+
+        // The latest version should work with the version mapping
+        let crates_versions =
+            get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, &latest)
+                .await
+                .unwrap();
+
+        assert!(
+            crates_versions.len() > 0,
+            "No crate versions found for latest version: {}",
+            latest
+        );
+    }
+
+    #[tokio::test]
+    // Verifies that get_polkadot_sdk_versions returns versions sorted newest-first.
+    // Stable tags should appear before crates-io versions, and within stable tags,
+    // higher base versions and patch numbers should come first.
+    async fn test_versions_list_is_sorted_newest_first() {
+        let versions = crate::versions::get_polkadot_sdk_versions()
+            .await
+            .unwrap();
+
+        assert!(!versions.is_empty());
+
+        // Find all stable tags and verify they are sorted correctly
+        let stable_tags: Vec<&str> = versions
+            .iter()
+            .filter(|v| v.starts_with("polkadot-stable"))
+            .map(|v| v.as_str())
+            .collect();
+
+        fn parse_stable_tag(tag: &str) -> (u32, u32) {
+            let rest = tag.strip_prefix("polkadot-stable").unwrap_or("");
+            match rest.split_once('-') {
+                Some((base, patch)) => {
+                    (base.parse().unwrap_or(0), patch.parse().unwrap_or(0))
+                }
+                None => (rest.parse().unwrap_or(0), 0),
+            }
+        }
+
+        for window in stable_tags.windows(2) {
+            let (a_base, a_patch) = parse_stable_tag(window[0]);
+            let (b_base, b_patch) = parse_stable_tag(window[1]);
+            assert!(
+                (a_base, a_patch) >= (b_base, b_patch),
+                "Stable tags not sorted newest-first: {} should come before {}",
+                window[0],
+                window[1]
+            );
+        }
+
+        // Stable tags should appear before crates-io versions
+        let first_crates_io = versions.iter().position(|v| !v.starts_with("polkadot-stable"));
+        let last_stable = versions.iter().rposition(|v| v.starts_with("polkadot-stable"));
+        if let (Some(first_cio), Some(last_st)) = (first_crates_io, last_stable) {
+            assert!(
+                last_st < first_cio,
+                "All stable tags should appear before crates-io versions"
+            );
+        }
+    }
+
+    #[tokio::test]
     // This test will fetch all available versions, update a generic parachain Cargo.toml file
     // and assert that the Cargo.toml file has been updated (modified)
     // This is not exhaustive, but it's a good way to ensure that the logic works for all versions

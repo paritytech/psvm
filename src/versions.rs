@@ -124,9 +124,7 @@ pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::err
         fn parse_stable_tag(tag: &str) -> (u32, u32) {
             let rest = tag.strip_prefix("polkadot-stable").unwrap_or("");
             match rest.split_once('-') {
-                Some((base, patch)) => {
-                    (base.parse().unwrap_or(0), patch.parse().unwrap_or(0))
-                }
+                Some((base, patch)) => (base.parse().unwrap_or(0), patch.parse().unwrap_or(0)),
                 None => (rest.parse().unwrap_or(0), 0),
             }
         }

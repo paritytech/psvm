@@ -340,10 +340,9 @@ to = "0.2.0"
         assert!(!latest.is_empty(), "Latest version should not be empty");
 
         // The latest version should work with the version mapping
-        let crates_versions =
-            get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, &latest)
-                .await
-                .unwrap();
+        let crates_versions = get_version_mapping_with_fallback(crate::DEFAULT_GIT_SERVER, &latest)
+            .await
+            .unwrap();
 
         assert!(
             crates_versions.len() > 0,
@@ -357,9 +356,7 @@ to = "0.2.0"
     // Stable tags should appear before crates-io versions, and within stable tags,
     // higher base versions and patch numbers should come first.
     async fn test_versions_list_is_sorted_newest_first() {
-        let versions = crate::versions::get_polkadot_sdk_versions()
-            .await
-            .unwrap();
+        let versions = crate::versions::get_polkadot_sdk_versions().await.unwrap();
 
         assert!(!versions.is_empty());
 
@@ -373,9 +370,7 @@ to = "0.2.0"
         fn parse_stable_tag(tag: &str) -> (u32, u32) {
             let rest = tag.strip_prefix("polkadot-stable").unwrap_or("");
             match rest.split_once('-') {
-                Some((base, patch)) => {
-                    (base.parse().unwrap_or(0), patch.parse().unwrap_or(0))
-                }
+                Some((base, patch)) => (base.parse().unwrap_or(0), patch.parse().unwrap_or(0)),
                 None => (rest.parse().unwrap_or(0), 0),
             }
         }
@@ -392,8 +387,12 @@ to = "0.2.0"
         }
 
         // Stable tags should appear before crates-io versions
-        let first_crates_io = versions.iter().position(|v| !v.starts_with("polkadot-stable"));
-        let last_stable = versions.iter().rposition(|v| v.starts_with("polkadot-stable"));
+        let first_crates_io = versions
+            .iter()
+            .position(|v| !v.starts_with("polkadot-stable"));
+        let last_stable = versions
+            .iter()
+            .rposition(|v| v.starts_with("polkadot-stable"));
         if let (Some(first_cio), Some(last_st)) = (first_crates_io, last_stable) {
             assert!(
                 last_st < first_cio,

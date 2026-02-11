@@ -26,8 +26,12 @@ jobs:
     
     - name: Run tests
       run: cargo test --locked
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Polkadot Runtimes Work
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cargo install --path . --locked
         git clone --depth 1 --branch main https://github.com/polkadot-fellows/runtimes

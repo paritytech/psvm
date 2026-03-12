@@ -16,9 +16,10 @@
 use clap::Parser;
 use env_logger::Env;
 use psvm::{
-    get_orml_crates_and_version, get_polkadot_sdk_versions, get_release_branches_versions,
-    get_version_mapping_with_fallback, include_orml_crates_in_version_mapping, update_dependencies,
-    validate_workspace_path, Repository, DEFAULT_GIT_SERVER,
+    get_latest_polkadot_sdk_version, get_orml_crates_and_version, get_polkadot_sdk_versions,
+    get_release_branches_versions, get_version_mapping_with_fallback,
+    include_orml_crates_in_version_mapping, update_dependencies, validate_workspace_path,
+    Repository, DEFAULT_GIT_SERVER,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -37,10 +38,14 @@ struct Command {
     #[clap(
         short,
         long,
-        required_unless_present_any = ["list", "git_ref"],
-        conflicts_with = "git_ref"
+        required_unless_present_any = ["list", "git_ref", "latest"],
+        conflicts_with_all = ["git_ref", "latest"]
     )]
     version: Option<String>,
+
+    /// Use the latest Polkadot SDK release version.
+    #[clap(short = 'L', long, conflicts_with_all = ["list", "git_ref"])]
+    latest: bool,
 
     /// Overwrite local dependencies (using path) with same name as the ones in the Polkadot SDK.
     #[clap(short, long)]
@@ -55,7 +60,7 @@ struct Command {
     check: bool,
 
     /// To either list available ORML versions or update the Cargo.toml file with corresponding ORML versions.
-    #[clap(short('O'), long, requires = "version")]
+    #[clap(short('O'), long)]
     orml: bool,
 
     /// Explicit git reference (branch or tag) to fetch release metadata from.
@@ -82,11 +87,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let version_or_ref = cmd
-        .version
+    let latest_version = if cmd.latest {
+        let v = get_latest_polkadot_sdk_version().await?;
+        println!("Using latest version: {}", v);
+        Some(v)
+    } else {
+        None
+    };
+
+    let version_or_ref = latest_version
         .as_deref()
+        .or(cmd.version.as_deref())
         .or(cmd.git_ref.as_deref())
-        .expect("clap enforces presence of either version or git_ref");
+        .expect("clap enforces presence of version, latest, or git_ref");
 
     let cargo_toml_path = validate_workspace_path(cmd.path)?;
 
@@ -95,10 +108,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         get_version_mapping_with_fallback(DEFAULT_GIT_SERVER, version_or_ref).await?;
 
     if cmd.orml {
-        let version = cmd
-            .version
+        let version = latest_version
             .as_deref()
-            .expect("ORML lookups require a version");
+            .or(cmd.version.as_deref())
+            .ok_or("ORML lookups require a version (use --version or --latest)")?;
         let orml_crates = get_orml_crates_and_version(DEFAULT_GIT_SERVER, version).await?;
         include_orml_crates_in_version_mapping(&mut crates_versions, orml_crates);
     }

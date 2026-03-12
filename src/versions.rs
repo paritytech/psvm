@@ -94,6 +94,15 @@ pub struct TagInfo {
     pub name: String,
 }
 
+/// Represents a GitHub release, used to deserialize the latest release API response.
+#[derive(Deserialize, Debug)]
+struct Release {
+    /// The tag name of the release.
+    tag_name: String,
+}
+
+const POLKADOT_SDK_LATEST_RELEASE_URL: &str =
+    "https://api.github.com/repos/paritytech/polkadot-sdk/releases/latest";
 const POLKADOT_SDK_TAGS_URL: &str =
     "https://api.github.com/repos/paritytech/polkadot-sdk/tags?per_page=100&page=";
 const POLKADOT_SDK_TAGS_GH_CMD_URL: &str = "/repos/paritytech/polkadot-sdk/tags?per_page=100&page=";
@@ -101,22 +110,78 @@ const POLKADOT_SDK_STABLE_TAGS_REGEX: &str = r"^polkadot-stable\d+(-\d+)?$";
 
 /// Fetches a combined list of Polkadot SDK release versions and stable tag releases.
 ///
-/// This function first retrieves release branch versions from the Polkadot SDK and
-/// then fetches stable tag releases versions. It combines these two lists into a
-/// single list of version strings.
+/// Returns versions sorted newest-first: stable tags followed by crates-io releases.
 ///
 /// # Returns
 /// A `Result` containing either a `Vec<String>` of combined version names on success,
 /// or an `Error` if any part of the process fails.
-///
-/// # Errors
-/// This function can return an error if either the fetching of release branches versions
-/// or the fetching of stable tag versions encounters an issue.
 pub async fn get_polkadot_sdk_versions() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut crates_io_releases = get_release_branches_versions(Repository::Psdk).await?;
     let mut stable_tag_versions = get_stable_tag_versions().await?;
-    crates_io_releases.append(&mut stable_tag_versions);
-    Ok(crates_io_releases)
+
+    // Sort stable tags by (base_version DESC, patch DESC) so newest appears first.
+    stable_tag_versions.sort_by(|a, b| {
+        fn parse_stable_tag(tag: &str) -> (u32, u32) {
+            let rest = tag.strip_prefix("polkadot-stable").unwrap_or("");
+            match rest.split_once('-') {
+                Some((base, patch)) => (base.parse().unwrap_or(0), patch.parse().unwrap_or(0)),
+                None => (rest.parse().unwrap_or(0), 0),
+            }
+        }
+        parse_stable_tag(b).cmp(&parse_stable_tag(a))
+    });
+
+    // Crates-io releases come oldest-first; reverse so newest is first.
+    crates_io_releases.reverse();
+
+    let mut all_versions = stable_tag_versions;
+    all_versions.append(&mut crates_io_releases);
+    Ok(all_versions)
+}
+
+/// Fetches the latest Polkadot SDK release version from GitHub.
+///
+/// This function queries the GitHub releases API for the latest release of the
+/// Polkadot SDK and normalizes the tag name into a version string compatible
+/// with `version_to_url()`.
+///
+/// # Returns
+/// A `Result` containing the normalized version string on success, or an `Error`
+/// if the API request or response parsing fails.
+pub async fn get_latest_polkadot_sdk_version() -> Result<String, Box<dyn std::error::Error>> {
+    let response = github_query(POLKADOT_SDK_LATEST_RELEASE_URL).await?;
+    let output = if response.status().is_success() {
+        response.text().await?
+    } else {
+        String::from_utf8(
+            std::process::Command::new("gh")
+                .args([
+                    "api",
+                    "-H",
+                    "Accept: application/vnd.github+json",
+                    "-H",
+                    "X-GitHub-Api-Version: 2022-11-28",
+                    "/repos/paritytech/polkadot-sdk/releases/latest",
+                ])
+                .output()?
+                .stdout,
+        )?
+    };
+
+    let release: Release = serde_json::from_str(&output)?;
+    let tag = release.tag_name;
+
+    let stable_tag_regex = Regex::new(POLKADOT_SDK_STABLE_TAGS_REGEX).unwrap();
+
+    let version = if let Some(stripped) = tag.strip_prefix("release-crates-io-v") {
+        stripped.to_string()
+    } else if stable_tag_regex.is_match(&tag) {
+        tag
+    } else {
+        tag
+    };
+
+    Ok(version)
 }
 
 async fn github_query(url: &str) -> Result<reqwest::Response, reqwest::Error> {
